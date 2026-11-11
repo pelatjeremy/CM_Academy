@@ -111,3 +111,9 @@ textarea.admin-input { resize: vertical; }
 .pedagogy-reader h3 { font-size: 1.5rem; overflow-wrap: anywhere; }
 .pedagogy-pagination { justify-content: space-between; flex-wrap: wrap; margin-top: 32px; }
 @media (max-width: 1000px) { .pedagogy-admin-grid { grid-template-columns: 1fr; } }
+.pedagogy-video { min-width: 0; margin-block: 24px; overflow-wrap: anywhere; }
+.pedagogy-video video { display: block; width: 100%; max-width: 960px; max-height: 70vh; background: #15251e; border-radius: 8px; margin-block: 16px; }
+.pedagogy-video video:focus-visible { outline: 3px solid #357653; outline-offset: 4px; }
+.pedagogy-video summary { cursor: pointer; padding-block: 12px; }
+.admin-attachments input[type="file"] { max-width: 100%; margin-block: 12px; }
+.admin-attachments .admin-actions { margin-block: 16px; flex-wrap: wrap; }

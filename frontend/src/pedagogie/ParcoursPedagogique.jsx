@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import {adminRequest} from '../admin/api';
+import VideoPlayer from './VideoPlayer';
 
 export default function ParcoursPedagogique({inscriptionId,formationId,leconId,admin=false}){
  const base=admin?'/api/admin/formations/'+encodeURIComponent(formationId)+'/contenu':'/api/stagiaire/inscriptions/'+encodeURIComponent(inscriptionId)+'/parcours';
@@ -18,6 +19,7 @@ export default function ParcoursPedagogique({inscriptionId,formationId,leconId,a
   {leconId?<><a href={link()}>← Sommaire du parcours</a>{!lesson?<p role="alert">Leçon introuvable dans ce parcours.</p>:<article>
    <h3>{lesson.titre}</h3>{admin&&<p className="admin-badge">{lesson.archive?'Archivée':lesson.publie?'Publiée':'Brouillon'}</p>}
    <div className="pedagogy-text">{lesson.contenu||'Contenu à préparer.'}</div>
+   <h4>Vidéos et replays</h4>{!(lesson.videos||[]).filter(v=>!v.retireAt).length?<p>Aucune vidéo disponible pour cette leçon.</p>:(lesson.videos||[]).filter(v=>!v.retireAt).map(video=><VideoPlayer key={lesson.id+'/'+video.id} video={video} base={base+'/lecons/'+lesson.id+'/videos'}/>)}
    <h4>Supports PDF</h4>{!lesson.supports.length?<p>Aucun support PDF.</p>:<ul className="admin-file-versions">{lesson.supports.map(file=><li key={file.id}>{file.archive&&<span className="admin-badge">Archivé · </span>}<a download href={base+'/lecons/'+lesson.id+'/supports/'+file.id+'/telecharger'}>{file.nomOriginal}</a><p>{Math.ceil(file.taille/1024)} Ko · PDF</p></li>)}</ul>}
    {!admin&&<><p>État déclaré : {lesson.progression.terminee?'Terminée':'À étudier'}</p><button className="admin-button" disabled={busy} onClick={progression}>{busy?'Enregistrement…':lesson.progression.terminee?'Reprendre mon étude':'Marquer comme terminée'}</button>{error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}</>}
    <nav className="admin-actions pedagogy-pagination" aria-label="Navigation des leçons">{index>0&&<a href={link(lessons[index-1].id)}>← Leçon précédente</a>}{index>=0&&index<lessons.length-1&&<a href={link(lessons[index+1].id)}>Leçon suivante →</a>}</nav>

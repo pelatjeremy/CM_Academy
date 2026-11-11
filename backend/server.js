@@ -1,5 +1,6 @@
 import prisma from './lib/prisma.js';
 import { createApp } from './app.js';
+import {videoProbeStatus} from './lib/videos.js';
 
 try {
   const production = process.env.NODE_ENV === 'production';
@@ -17,6 +18,9 @@ try {
     trustedProxy: process.env.TRUSTED_PROXY || false,
   });
   const port = Number(process.env.PORT || 3001);
+  const probe=await videoProbeStatus();
+  if(probe.available)console.log('Vidéos : ffprobe '+probe.version+' disponible.');
+  else console.warn(probe.error);
   const server = app.listen(port, () =>
     console.log('API CMH Academy : http://localhost:' + server.address().port)
   );

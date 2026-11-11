@@ -3,12 +3,13 @@ import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
 import {inscriptionTransaction} from '../lib/preinscriptions.js';
 import {telechargerDocument} from '../lib/telechargement.js';
+import {videoProbeStatus} from '../lib/videos.js';
 import {route,parse,probleme,moduleSchema,leconSchema,ordreSchema,revisionSchema,adminModuleSelect,supportSelect,formation,avancer,moduleDu,leconDe} from '../lib/pedagogie.js';
-export function adminPedagogie(prisma,storage){
+export function adminPedagogie(prisma,storage,videoMaxFileBytes){
  const router=Router(),base='/formations/:formationId/contenu';
  router.get(base,route(async(req,res)=>{
   const result=await prisma.$transaction(async tx=>{const f=await formation(tx,req.params.formationId);return {formation:{id:f.id,titre:f.titre},revision:f.parcoursPedagogique?.revision||0,modules:await tx.modulePedagogique.findMany({where:{formationId:f.id},select:adminModuleSelect,orderBy:[{ordre:'asc'},{id:'asc'}]})};},{isolationLevel:'RepeatableRead'});
-  res.json(result);
+  res.json({...result,videoMaxFileBytes,videoProbe:await videoProbeStatus()});
  }));
  for(const kind of ['modules','lecons']){
   const create=kind==='modules'?base+'/modules':base+'/modules/:moduleId/lecons';

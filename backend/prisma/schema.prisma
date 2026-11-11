@@ -145,6 +145,8 @@ model Utilisateur {
   organismesModifies OrganismeAttestation[]
   attestationsEmises AttestationEmission[]
   supportsPedagogiques SupportLecon[]
+  videosDeposees VideoLecon[] @relation("VideoAuteur")
+  videosRetirees VideoLecon[] @relation("VideoRetrait")
 }
 
 enum TypeDemandeInscription {
@@ -212,6 +214,7 @@ model LeconPedagogique {
  updatedAt DateTime @updatedAt
  module ModulePedagogique @relation(fields:[moduleId],references:[id],onDelete:Restrict)
  supports SupportLecon[]
+ videos VideoLecon[]
  progressions ProgressionLecon[]
  @@unique([moduleId,ordre])
 }
@@ -243,6 +246,33 @@ model ProgressionLecon {
  lecon LeconPedagogique @relation(fields:[leconId],references:[id],onDelete:Restrict)
  @@id([inscriptionId,leconId])
  @@index([leconId])
+}
+
+// Versions immuables : un remplacement retire la version précédente, sans effacer l'objet.
+model VideoLecon {
+ id String @id @default(cuid())
+ leconId String
+ version Int
+ depotId String @unique @db.Uuid
+ stockageKey String @unique @db.Uuid
+ nomOriginal String @db.VarChar(255)
+ taille Int
+ typeMime String @db.VarChar(32)
+ empreinte String @db.Char(64)
+ titre String @db.VarChar(160)
+ description String @default("") @db.VarChar(3000)
+ transcription String @default("")
+ dureeSecondes Float
+ date DateTime @default(now())
+ auteurId String
+ retireAt DateTime?
+ retireParId String?
+ lecon LeconPedagogique @relation(fields:[leconId],references:[id],onDelete:Restrict)
+ auteur Utilisateur @relation("VideoAuteur",fields:[auteurId],references:[id],onDelete:Restrict)
+ retirePar Utilisateur? @relation("VideoRetrait",fields:[retireParId],references:[id],onDelete:Restrict)
+ @@unique([leconId,version])
+ @@index([auteurId])
+ @@index([retireParId])
 }
 
 enum CategorieDocumentaire {

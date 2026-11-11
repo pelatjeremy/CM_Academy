@@ -1,5 +1,15 @@
 # CMH Academy — socle local
 
+## Vidéos et replays — branche de développement
+
+Gestion ADMIN de MP4 privés par version, lecteur protégé avec Range/HEAD,
+transcription et progression toujours déclarative. La migration
+`20261111180000_videos_pedagogiques` a été appliquée à `cmh_academy_dev` après
+sauvegarde conjointe et restauration isolée vérifiée : quatorze migrations
+terminées, aucune divergence, aucune vidéo créée automatiquement.
+Voir [les formats, limites et tests isolés](backend/docs/videos-pedagogiques.md).
+Le dépôt contient le code ; aucun fichier vidéo ni stockage privé n'est versionné.
+
 ## Point de sauvegarde GitHub — 11 novembre 2026
 
 Ce point de sauvegarde couvre le catalogue, l'administration, les inscriptions,

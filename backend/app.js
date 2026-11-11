@@ -19,6 +19,8 @@ import { adminDossiers } from './admin/dossiers.js';
 import { adminFichiers } from './admin/fichiers.js';
 import { createDocumentStorage } from './lib/documents.js';
 import {normaliserConflitTransaction} from './lib/preinscriptions.js';
+import {createVideoStorage} from './lib/videos.js';
+import {adminVideos,videosStagiaire} from './videos-pedagogiques.js';
 
 export async function createApp(options) {
   const { prisma } = options;
@@ -59,7 +61,10 @@ export async function createApp(options) {
   app.use('/api', publicCatalogue(prisma, options.clock));
   app.use('/api', publicPreinscriptions(prisma, options.clock));
   const auth = await configureAuth(app, options);
-  app.use('/api/admin', adminPedagogie(prisma, createDocumentStorage({...options.documentStorage,mimeTypes:['application/pdf']})));
+  const videoStorage=createVideoStorage({root:options.documentStorage?.root,...options.videoStorage});
+  app.use('/api/admin', adminVideos(prisma,videoStorage));
+  app.use('/api/stagiaire', videosStagiaire(prisma,videoStorage));
+  app.use('/api/admin', adminPedagogie(prisma, createDocumentStorage({...options.documentStorage,mimeTypes:['application/pdf']}),videoStorage.maxFileBytes));
   app.use('/api/stagiaire', pedagogieStagiaire(prisma, createDocumentStorage(options.documentStorage)));
   app.use('/api/admin', adminAttestations(prisma, createDocumentStorage(options.documentStorage), options.attestationPdf, options.clock));
   // Le middleware de session, de rôle et de CSRF est installé avant ce routeur.

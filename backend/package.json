@@ -25,7 +25,10 @@
     "test:recette": "node scripts/recette-transversale.mjs",
     "test:elearning": "node scripts/test-auth.mjs --catalogue --formations --sessions --public --inscriptions --dossiers --documents --stagiaires --questionnaires --presences --attestations --elearning",
     "test:elearning:schema": "node scripts/test-elearning-schema.mjs",
-    "test:concurrence-inscriptions": "node scripts/test-auth.mjs --inscriptions --stress-inscriptions"
+    "test:concurrence-inscriptions": "node scripts/test-auth.mjs --inscriptions --stress-inscriptions",
+    "test:videos": "node scripts/test-auth.mjs --catalogue --formations --sessions --public --inscriptions --dossiers --documents --stagiaires --questionnaires --presences --attestations --elearning --videos",
+    "test:videos:browser": "node scripts/test-auth.mjs --catalogue --formations --sessions --public --inscriptions --dossiers --documents --stagiaires --questionnaires --presences --attestations --elearning --videos --video-browser",
+    "test:videos:schema": "node scripts/test-videos-schema.mjs"
   },
   "keywords": [],
   "author": "",
@@ -50,6 +53,8 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "ffmpeg-ffprobe-static": "6.1.2-rc.1",
     "prisma": "^7.10.1"
   }
 }

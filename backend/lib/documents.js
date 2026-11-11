@@ -1,6 +1,7 @@
 import path from 'node:path';
 import {randomUUID, createHash} from 'node:crypto';
-import {createReadStream, constants} from 'node:fs';
+import {createReadStream, createWriteStream, constants} from 'node:fs';
+import {pipeline} from 'node:stream/promises';
 import {mkdir, realpath, lstat, open, link, unlink, readdir, writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import multer from 'multer';
@@ -67,22 +68,32 @@ export function createDocumentStorage(config = {}) {
     });
   }
 
+  const acceptedTypes = config.types || types;
   const upload = multer({
-    storage: multer.diskStorage({
-      destination(req, file, callback) { callback(null, temporary); },
-      filename(req, file, callback) {
+    storage: {
+      _handleFile(req, file, callback) {
         const filename = randomUUID() + '.part';
         req.documentTemporary = path.join(temporary, filename);
-        callback(null, filename);
+        const output = createWriteStream(req.documentTemporary, {flags:'wx', mode:0o600});
+        const abort = () => file.stream.destroy(documentError('ABORT'));
+        req.once('aborted', abort);
+        if (req.aborted) abort();
+        pipeline(file.stream, output).then(
+          () => callback(null, {destination:temporary, filename, path:req.documentTemporary, size:output.bytesWritten}),
+          error => callback(error)
+        ).finally(() => req.off('aborted', abort));
       },
-    }),
+      _removeFile(req, file, callback) {
+        unlink(file.path).then(() => callback(null), error => callback(error.code==='ENOENT'?null:error));
+      },
+    },
     defParamCharset: 'utf8',
     preservePath: false,
-    limits: {fileSize: maxFileBytes, files: 1, fields: 0, parts: 1, fieldNameSize: 50, headerPairs: 50},
+    limits: {fileSize: maxFileBytes, files: 1, fields: config.fields || 0, parts: 1 + (config.fields || 0), fieldSize: 131072, fieldNameSize: 50, headerPairs: 50},
     fileFilter(req, file, callback) {
       try {
         const name = nomSecurise(file.originalname);
-        if (types.get(path.extname(name).toLowerCase()) !== file.mimetype || (config.mimeTypes && !config.mimeTypes.includes(file.mimetype))) throw documentError('TYPE');
+        if (acceptedTypes.get(path.extname(name).toLowerCase()) !== file.mimetype || (config.mimeTypes && !config.mimeTypes.includes(file.mimetype))) throw documentError('TYPE');
         callback(null, true);
       } catch (error) {
         callback(error);
@@ -95,7 +106,7 @@ export function createDocumentStorage(config = {}) {
     if (!req.is('multipart/form-data')) throw documentError('TYPE');
     await new Promise((resolve, reject) => upload(req, res, error => error ? reject(error) : resolve()));
     if (!req.file || !req.file.size) throw documentError('TYPE');
-    const expected = types.get(path.extname(nomSecurise(req.file.originalname)).toLowerCase());
+    const expected = acceptedTypes.get(path.extname(nomSecurise(req.file.originalname)).toLowerCase());
     let detected;
     try { detected = await fileTypeFromFile(req.file.path); }
     catch { throw documentError('TYPE'); }
@@ -160,6 +171,7 @@ export function createDocumentStorage(config = {}) {
     const rows = await prisma.pieceJointe.findMany({select: {id: true, stockageKey: true, taille: true, empreinte: true}});
     // Les supports pédagogiques utilisent les mêmes objets privés et les mêmes sauvegardes.
     if (prisma.supportLecon) rows.push(...await prisma.supportLecon.findMany({select:{id:true,stockageKey:true,taille:true,empreinte:true}}));
+    if (prisma.videoLecon) rows.push(...await prisma.videoLecon.findMany({select:{id:true,stockageKey:true,taille:true,empreinte:true}}));
     if (new Set(rows.map(row=>row.stockageKey)).size !== rows.length) throw documentError('STORAGE');
     const references = new Map(rows.map(row => [row.stockageKey, row]));
     const report = {temporaires: [], orphelins: [], manquants: [], alteres: [], inconnus: 0, temporairesNettoyes: 0};
