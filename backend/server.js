@@ -1,9 +1,12 @@
 import prisma from './lib/prisma.js';
 import { createApp } from './app.js';
 import {videoProbeStatus} from './lib/videos.js';
+import {fileURLToPath} from 'node:url';
+import {demoTarget} from './lib/demo-target.js';
 
 try {
   const production = process.env.NODE_ENV === 'production';
+  if(process.env.DEMO_MODE==='true')demoTarget();
   const origins =
     process.env.APP_ORIGINS?.split(',')
       .map((value) => value.trim())
@@ -15,15 +18,18 @@ try {
     origins,
     connectionString: process.env.DATABASE_URL,
     sessionSecret: process.env.SESSION_SECRET,
-    trustedProxy: process.env.TRUSTED_PROXY || false,
+    trustedProxy: /^\d+$/.test(process.env.TRUSTED_PROXY||'')?Number(process.env.TRUSTED_PROXY):process.env.TRUSTED_PROXY||false,
+    demo:process.env.DEMO_MODE==='true',
+    frontendDir:process.env.SERVE_FRONTEND==='true'?fileURLToPath(new URL('../frontend/dist/',import.meta.url)):undefined,
   });
   const port = Number(process.env.PORT || 3001);
   const probe=await videoProbeStatus();
   if(probe.available)console.log('Vidéos : ffprobe '+probe.version+' disponible.');
   else console.warn(probe.error);
-  const server = app.listen(port, () =>
+  const server = app.listen(port,process.env.BIND_HOST||'0.0.0.0', () =>
     console.log('API CMH Academy : http://localhost:' + server.address().port)
   );
+  server.requestTimeout=30*60*1000;
   const stop = () =>
     server.close(async () => {
       await close();

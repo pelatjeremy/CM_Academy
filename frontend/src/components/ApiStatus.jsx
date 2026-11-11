@@ -35,7 +35,7 @@ function ApiStatus() {
       } catch {
         if (actif) {
           setMessage(
-            'Serveur inaccessible. Vérifie que le backend est démarré.'
+            'Le service est momentanément indisponible. Réessayez dans quelques instants.'
           );
         }
       } finally {

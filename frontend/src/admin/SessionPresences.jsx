@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {adminRequest} from './api';
-import {formatParis} from './session-time';
+import {plageFr} from './session-time';
 import {Confirmation} from '../questionnaires/QuestionnaireCommun';
 import {etatsPresence,dureePresence} from '../presences/presence-labels';
 import PresenceHistorique from '../presences/PresenceHistorique';
@@ -53,7 +53,7 @@ export default function SessionPresences({id,setDirty}){
   <p>Dès qu’un relevé existe, les horaires et la durée de la séance sont verrouillés, même si ce relevé revient à Non renseigné.</p>
   {state.loading&&<p role="status">Chargement des séances et inscriptions…</p>}{state.error&&<div role="alert"><p>{state.error}</p><button className="admin-button secondary" onClick={()=>setAttempt(n=>n+1)}>Réessayer</button></div>}
   {item&&<>{!item.seances.length?<p>Aucune séance programmée.</p>:!confirmees.length?<p>Aucune inscription confirmée.</p>:<h2>Inscriptions confirmées</h2>}
-   {item.seances.map(seance=><section className="admin-panel" key={seance.id}><h2>{formatParis(seance.debut)} → {formatParis(seance.fin)}</h2><p>Durée programmée : {dureePresence(new Date(seance.fin)-new Date(seance.debut))}</p>
+   {item.seances.map(seance=><section className="admin-panel" key={seance.id}><h2>{plageFr(seance.debut,seance.fin)}</h2><p>Durée programmée : {dureePresence(new Date(seance.fin)-new Date(seance.debut))}</p>
     {confirmees.map(inscription=><Releve key={inscription.id} inscription={inscription} seance={seance} onDirty={onDirty}/>)}
     {!!historiques.filter(i=>i.presences.some(p=>p.seanceId===seance.id)).length&&<h3>Historique des inscriptions non confirmées</h3>}
     {historiques.filter(i=>i.presences.some(p=>p.seanceId===seance.id)).map(inscription=><Releve key={inscription.id} inscription={inscription} seance={seance} onDirty={onDirty}/>)}

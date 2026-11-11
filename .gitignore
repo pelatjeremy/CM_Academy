@@ -8,6 +8,9 @@ dist/
 .npm-cache/
 .private-documents/
 .local-tools/
+.demo-assets/
+.demo-secrets/
+.demo-environment/
 
 # Secrets and local configuration (only sanitized examples are published)
 !.env.*.example

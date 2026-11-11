@@ -51,3 +51,8 @@ button:focus-visible {
 section[id] {
   scroll-margin-top: 24px;
 }
+:root { color-scheme: light; }
+.demo-notice { padding: 9px 20px; background: #f3ecd9; color: #4c573f; text-align: center; font-size: .85rem; line-height: 1.5; border-bottom: 1px solid #ded6bd; }
+.site-header nav { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+.site-header nav [aria-current="page"] { font-weight: 700; text-decoration: underline; text-underline-offset: 6px; }
+@media(max-width:600px) { .demo-notice span { display: block; } .header-content { flex-wrap: wrap; gap: 16px; } }

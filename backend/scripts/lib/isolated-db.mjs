@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import { Client } from 'pg';
 
 export const backend = fileURLToPath(new URL('../../', import.meta.url));
-export async function isolatedDb() {
+export async function isolatedDb({namePrefix='cmh_auth_test'}={}) {
+  assert(['cmh_auth_test','cmh_academy_demo'].includes(namePrefix));
   const base = path.join(backend, '.catalogue-test'); mkdirSync(base, { recursive: true });
   const run = mkdtempSync(path.join(base, 'auth-'));
   const data = path.join(run, 'data');
@@ -16,7 +17,7 @@ export async function isolatedDb() {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^PG/i.test(k) && !['DATABASE_URL','SHADOW_DATABASE_URL','SESSION_SECRET'].includes(k)));
   const password = randomBytes(32).toString('hex');
   const user = 'cmh_auth_test';
-  const database = `cmh_auth_test_${randomBytes(6).toString('hex')}`;
+  const database = `${namePrefix}_${randomBytes(6).toString('hex')}`;
   const pwfile = path.join(run, 'password.txt'); writeFileSync(pwfile, password, {flag:'wx',mode:0o600});
   function command(exe, args, extraEnv = {}) {
     const result = spawnSync(exe, args, {cwd:backend,env:{...env,...extraEnv},windowsHide:true,encoding:'utf8',timeout:120000});

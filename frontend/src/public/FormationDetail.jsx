@@ -1,7 +1,7 @@
 import PublicLayout from './PublicLayout';
 import Preinscription from './Preinscription';
 import {usePublicResource} from './usePublicResource';
-import {duration,price,formatLabels,parisDate,parisTime} from './format';
+import {duration,price,formatLabels,parisDate,plageFr} from './format';
 
 function TextSection({id,title,value}){return <section className="formation-section" id={id} aria-labelledby={`${id}-title`}><h2 id={`${id}-title`}>{title}</h2><p className="public-text">{value||'Information à préciser.'}</p></section>;}
 
@@ -32,8 +32,8 @@ export default function FormationDetail({slug}){
           </section>
           <section className="formation-section" id="intervenants" aria-labelledby="intervenants-title"><h2 id="intervenants-title">Les formateurs</h2>{formation.formateurs.length?<div className="public-trainers">{formation.formateurs.map((trainer,index)=><article key={index}><h3>{trainer.nom}</h3><p className="public-text">{trainer.biographie||'Présentation à venir.'}</p></article>)}</div>:<p>Les formateurs seront annoncés prochainement.</p>}</section>
           <section className="formation-section" id="dates" aria-labelledby="dates-title"><h2 id="dates-title">Dates des sessions</h2>
-            {!formation.sessions.length?<p>Les prochaines dates seront annoncées prochainement</p>:<><p className="public-muted">Toutes les dates et heures sont indiquées dans le fuseau Europe/Paris. Le décalage UTC précise l’heure d’été ou d’hiver.</p>
-              <ol className="public-sessions">{formation.sessions.map((session,index)=><li key={index}><h3>Session du {parisDate(session.seances[0].debut)}</h3>{session.lieu&&<p className="public-text"><strong>Lieu :</strong> {session.lieu}</p>}<ol className="public-seances">{session.seances.map((seance,i)=><li key={i}><span className="seance-number">Séance {i+1}</span><p><time dateTime={seance.debut}>{parisDate(seance.debut)} à {parisTime(seance.debut)}</time><br/>jusqu’au <time dateTime={seance.fin}>{parisDate(seance.fin)} à {parisTime(seance.fin)}</time></p></li>)}</ol>
+            {!formation.sessions.length?<p>Les prochaines dates seront annoncées prochainement</p>:<><p className="public-muted">Dates et horaires en heure de Paris ; les changements d’heure sont pris en compte.</p>
+              <ol className="public-sessions">{formation.sessions.map((session,index)=><li key={index}><h3>Session du {parisDate(session.seances[0].debut)}</h3>{session.lieu&&<p className="public-text"><strong>Lieu :</strong> {session.lieu}</p>}<ol className="public-seances">{session.seances.map((seance,i)=><li key={i}><span className="seance-number">Séance {i+1}</span><p><time dateTime={seance.debut}>{plageFr(seance.debut,seance.fin)}</time></p></li>)}</ol>
                 {session.preinscriptionSessionId && <Preinscription sessionId={session.preinscriptionSessionId} />}
               </li>)}</ol>
             </>}

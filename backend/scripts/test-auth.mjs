@@ -231,7 +231,7 @@ try {
     const frontend=path.resolve(backend,'../frontend');const require=createRequire(path.join(frontend,'package.json'));
     const {createServer}=await import(pathToFileURL(require.resolve('vite')).href);
     const {default:react}=await import(pathToFileURL(require.resolve('@vitejs/plugin-react')).href);
-    vite=await createServer({configFile:false,root:frontend,plugins:[react()],server:{host:'127.0.0.2',port:0,proxy:{'/api':{target:base,changeOrigin:true}}}});await vite.listen();
+    vite=await createServer({configFile:false,root:frontend,plugins:[react()],server:{fs:{allow:[frontend,path.resolve(backend,'../shared')]},host:'127.0.0.2',port:0,proxy:{'/api':{target:base,changeOrigin:true}}}});await vite.listen();
     const browserOrigin=`http://127.0.0.2:${vite.httpServer.address().port}`;
     await stop();await start({origins:[origin,browserOrigin]});
     // Le proxy a gardé l'ancien port : mise à jour avant le premier accès navigateur.
@@ -239,7 +239,7 @@ try {
       if(existsSync(path.join(fixture.run,'simulate-public-error')) && (req.url?.startsWith('/api/catalogue/formations')||req.url?.startsWith('/api/formations/'))){res.statusCode=503;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error:'Indisponibilité de test isolé.'}));return;}
       next();
     });}};
-    await vite.close();vite=await createServer({configFile:false,root:frontend,plugins:[react(),testFailures],server:{host:'127.0.0.2',port:Number(new URL(browserOrigin).port),strictPort:true,proxy:{'/api':{target:base,changeOrigin:true}}}});await vite.listen();
+    await vite.close();vite=await createServer({configFile:false,root:frontend,plugins:[react(),testFailures],server:{fs:{allow:[frontend,path.resolve(backend,'../shared')]},host:'127.0.0.2',port:Number(new URL(browserOrigin).port),strictPort:true,proxy:{'/api':{target:base,changeOrigin:true}}}});await vite.listen();
     writeFileSync(path.join(fixture.run,'browser.json'),JSON.stringify({email:admin.email,password,origin:browserOrigin}),{mode:0o600});
     console.log(`NAVIGATEUR ${browserOrigin}/admin/connexion`);console.log(`DOSSIER ${fixture.run}`);
     if(process.argv.includes('--video-browser')) {

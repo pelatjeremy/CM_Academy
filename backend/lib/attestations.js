@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {z} from 'zod';
-export const modeleVersion = 'cmh-attestation-1';
+export const modeleVersion = 'cmh-attestation-2';
 const texte = max => z.string().trim().max(max).refine(v => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(v), 'Caractère non autorisé.');
 export const organismeSchema = z.object({revision:z.number().int().min(0).max(2147483646),denomination:texte(200).refine(v=>v.length>0,'Renseignez la dénomination de l’organisme.'),adresse:texte(1000).refine(v=>v.length>0,'Renseignez l’adresse de l’organisme.'),identifiant:texte(100),representant:texte(200)}).strict();
 export const emissionSchema = z.object({requeteId:z.string().uuid(),empreinte:z.string().regex(/^[a-f0-9]{64}$/),couranteId:z.string().max(128).nullable(),motif:texte(500),confirmation:z.literal(true)}).strict();
@@ -16,7 +16,7 @@ export const routeAttestation = handler => async(req,res,next) => {
  }
 };
 export async function preparerAttestation(tx,id,now=new Date()) {
- const item=await tx.inscription.findUnique({where:{id},select:{id:true,prenom:true,nom:true,dossier:{select:{inscriptionId:true}},session:{select:{id:true,lieu:true,formation:{select:{titre:true,objectifs:true,format:true}},seances:{select:{id:true,debut:true,fin:true},orderBy:[{debut:'asc'},{id:'asc'}]}}},presences:{select:{seanceId:true,etat:true,dureeSuivieMs:true,revision:true}}}});
+ const item=await tx.inscription.findUnique({where:{id},select:{id:true,prenom:true,nom:true,dossier:{select:{inscriptionId:true}},session:{select:{id:true,lieu:true,formation:{select:{titre:true,objectifs:true,format:true,dureeMinutes:true}},seances:{select:{id:true,debut:true,fin:true},orderBy:[{debut:'asc'},{id:'asc'}]}}},presences:{select:{seanceId:true,etat:true,dureeSuivieMs:true,revision:true}}}});
  if(!item?.dossier)throw erreurAttestation(404,'Dossier introuvable. Initialisez-le depuis l’inscription.');
  const organisme=await tx.organismeAttestation.findUnique({where:{id:'principal'},select:organismeSelect});
  const courante=await tx.attestationEmission.findFirst({where:{inscriptionId:id,courante:true},select:{id:true,numero:true}});

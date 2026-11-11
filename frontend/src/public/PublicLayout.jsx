@@ -1,12 +1,13 @@
 import {useEffect} from 'react';
 
 export default function PublicLayout({title='CMH Academy — Formations équestres',children}){
+  const path=window.location.pathname;
   useEffect(()=>{document.title=title;},[title]);
   return <>
     <a className="skip-link" href="#contenu">Aller au contenu</a>
     <header className="site-header"><div className="container header-content">
       <a className="brand" href="/" aria-label="CMH Academy — Accueil">CMH <span>Academy</span></a>
-      <nav aria-label="Navigation principale"><a href="/#poles">Nos pôles de formation</a>{' · '}<a href="/formations">Nos formations</a>{' · '}<a href="/stagiaire/connexion">Espace stagiaire</a></nav>
+      <nav aria-label="Navigation principale"><a href="/#poles">Nos pôles de formation</a><a href="/formations" aria-current={path.startsWith('/formations')?'page':undefined}>Nos formations</a><a href="/stagiaire/connexion" aria-current={path.startsWith('/stagiaire')?'page':undefined}>Espace stagiaire</a></nav>
     </div></header>
     <main id="contenu">{children}</main>
     <footer className="site-footer"><div className="container"><p>© {new Date().getFullYear()} CMH Academy</p><p>Le cheval, au cœur de la transmission.</p></div></footer>

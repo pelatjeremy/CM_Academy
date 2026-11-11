@@ -13,7 +13,7 @@ export function parisInstant(local, offset = '') {
   const later = plain.toZonedDateTime(parisZone, { disambiguation: 'later' });
   const candidates = [earlier, later].filter((value, index, all) => value.toPlainDateTime().equals(plain) && !all.slice(0,index).some(other => other.epochMilliseconds === value.epochMilliseconds));
   if (!candidates.length) return { field: 'Local', error: 'Heure inexistante à Paris lors du passage à l’heure d’été. Choisissez une autre heure.' };
-  if (candidates.length > 1 && !offset) return { field: 'Offset', error: 'Heure ambiguë à Paris : précisez UTC+02:00 (première occurrence) ou UTC+01:00 (seconde occurrence).' };
+  if (candidates.length > 1 && !offset) return { field: 'Offset', error: 'Cette heure se produit deux fois à Paris : choisissez l’heure d’été (première occurrence) ou l’heure d’hiver (seconde occurrence).' };
   const chosen = offset ? candidates.find(candidate => candidate.offset === offset) : candidates[0];
   if (!chosen) return { field: 'Offset', error: 'Ce décalage ne correspond pas à cette heure de Paris. Choisissez Automatique ou le décalage applicable.' };
   return { instant: new Date(chosen.epochMilliseconds) };

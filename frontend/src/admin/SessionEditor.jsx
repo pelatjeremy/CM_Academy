@@ -3,7 +3,7 @@ import {adminRequest} from './api';
 import {FormField} from './CatalogueResource';
 import {durationLabel,rowOrder} from './session-time';
 
-const offsetOptions=[{value:'+02:00',label:'Heure d’été — UTC+02:00'},{value:'+01:00',label:'Heure d’hiver — UTC+01:00'}];
+const offsetOptions=[{value:'+02:00',label:'Heure d’été — première occurrence'},{value:'+01:00',label:'Heure d’hiver — seconde occurrence'}];
 const privateBlank={lienVisioconference:'',consignes:''};
 const valuesOf=item=>({formationId:item.formationId,capacite:String(item.capacite??''),lieu:item.lieu||'',modalitesPratiques:item.modalitesPratiques,visiblePubliquement:item.visiblePubliquement,preinscriptionsOuvertes:item.preinscriptionsOuvertes,
   seances:item.seances.map(row=>({id:row.id,key:row.id,debutLocal:row.debutLocal,finLocal:row.finLocal,debutOffset:row.debutOffset,finOffset:row.finOffset}))});
@@ -71,12 +71,12 @@ export default function SessionEditor({id,setDirty}){
             {errors[`seances.${index}.id`]&&<p className="admin-field-error">{errors[`seances.${index}.id`]}</p>}
             <div className="admin-filter-grid">{['debut','fin'].map(part=><div key={part}>
               <FormField field={{name:`seance-${row.key}-${part}`,label:part==='debut'?'Début (Europe/Paris)':'Fin (Europe/Paris)',type:'datetime-local',step:'0.001',required:true}} value={row[`${part}Local`]} error={errors[`seances.${index}.${part}Local`]} disabled={disabled} onChange={value=>rowField(index,`${part}Local`,value)} />
-              <FormField field={{name:`seance-${row.key}-${part}-offset`,label:`Décalage ${part==='debut'?'du début':'de la fin'}`,type:'select',placeholder:'Automatique (hors heure ambiguë)',options:offsetOptions,hint:'À préciser seulement en cas d’heure ambiguë. UTC+02:00 précède UTC+01:00 à l’automne.'}} value={row[`${part}Offset`]} error={errors[`seances.${index}.${part}Offset`]} disabled={disabled} onChange={value=>rowField(index,`${part}Offset`,value)} />
+              <FormField field={{name:`seance-${row.key}-${part}-offset`,label:`Décalage ${part==='debut'?'du début':'de la fin'}`,type:'select',placeholder:'Automatique (hors heure ambiguë)',options:offsetOptions,hint:'À préciser seulement en cas d’heure ambiguë. La première occurrence précède la seconde lors du passage à l’heure d’hiver.'}} value={row[`${part}Offset`]} error={errors[`seances.${index}.${part}Offset`]} disabled={disabled} onChange={value=>rowField(index,`${part}Offset`,value)} />
             </div>)}</div>
             <button className="admin-button secondary" type="button" disabled={disabled} onClick={()=>change({...values,seances:values.seances.filter((_,i)=>i!==index)})}>Retirer la séance {order+1}</button><p className="admin-hint">Le retrait ne sera appliqué qu’à l’enregistrement.</p>
           </fieldset>)}
           <div className="admin-actions"><button className="admin-button secondary" type="button" disabled={disabled||values.seances.length>=100} onClick={()=>change({...values,seances:[...values.seances,{key:crypto.randomUUID(),debutLocal:'',finLocal:'',debutOffset:'',finOffset:''}]})}>Ajouter une séance</button><button className="admin-button secondary" type="button" disabled={disabled} onClick={verify}>Vérifier les horaires</button></div>
-          {preview?<div className={`admin-notice ${preview.durationMismatch?'warning':''}`} role="status"><p>Durée totale calculée : <strong>{durationLabel(preview.totalMinutes)}</strong>. Durée pédagogique annoncée : {durationLabel(preview.announcedMinutes)}.</p>{preview.durationMismatch&&<p>Les durées diffèrent. Vérifiez le calendrier ; cet avertissement ne bloque pas l’enregistrement.</p>}</div>:<p className="admin-hint">Vérifiez les horaires ou enregistrez pour calculer la durée totale.</p>}
+          {preview?<div className={`admin-notice ${preview.durationMismatch?'warning':''}`} role="status"><p>Heures programmées : <strong>{durationLabel(preview.totalMinutes)}</strong>. Durée pédagogique annoncée : {durationLabel(preview.announcedMinutes)}.</p>{preview.durationMismatch&&<p>Les durées diffèrent. Vérifiez le calendrier ; cet avertissement ne bloque pas l’enregistrement.</p>}</div>:<p className="admin-hint">Vérifiez les horaires ou enregistrez pour calculer la durée totale.</p>}
         </section>
         <div className="admin-actions admin-save-actions"><button className="admin-button" type="submit" disabled={disabled||conflict}>{busy?'Traitement…':'Enregistrer la session'}</button><a className="admin-button secondary" href="/admin/catalogue/sessions">Retour à la liste</a></div>
       </form>

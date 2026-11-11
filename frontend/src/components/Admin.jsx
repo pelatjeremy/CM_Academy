@@ -17,7 +17,7 @@ export default function Admin({ connexion, stagiaire = false }) {
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = `${connexion ? (stagiaire ? 'Connexion stagiaire' : 'Connexion administrateur') : 'Administration'} — CMH Academy`;
+    document.title = `${connexion ? (stagiaire ? 'Connexion stagiaire' : 'Connexion administrateur') : (stagiaire?'Espace stagiaire':'Administration')} — CMH Academy`;
     let actif = true;
     async function verifier() {
       try {

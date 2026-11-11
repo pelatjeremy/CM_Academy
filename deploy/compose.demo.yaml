@@ -1,0 +1,49 @@
+name: cmh-academy-demo
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: cmh_academy_demo
+      POSTGRES_USER: cmh_demo
+      POSTGRES_PASSWORD: ${DEMO_DB_PASSWORD:?Configure the private demo env file}
+    volumes:
+      - demo-postgres:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U cmh_demo -d cmh_academy_demo']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    env_file: .env.demo
+    environment:
+      DOCUMENT_STORAGE_DIR: /data/private
+      DEMO_MODE: 'true'
+      DEMO_DATABASE_NAME: cmh_academy_demo
+      SERVE_FRONTEND: 'true'
+      NODE_ENV: production
+      TRUSTED_PROXY: '1'
+      PORT: '3001'
+    volumes:
+      - demo-private:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  https:
+    image: caddy:2
+    environment:
+      DEMO_HOST: ${DEMO_HOST:?Configure the demo hostname}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - demo-caddy:/data
+    depends_on: [app]
+    restart: unless-stopped
+volumes:
+  demo-postgres:
+  demo-private:
+  demo-caddy:

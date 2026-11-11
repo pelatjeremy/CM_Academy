@@ -1,0 +1,10 @@
+{
+  "projectId": "c1086f0c-5fc9-4d15-b59e-85917d9ceec8",
+  "environmentId": "c5a64f2b-ba5a-4e9f-ad80-cbc99cc01c81",
+  "environmentName": "demonstration",
+  "appServiceId": "da7ecd8a-a16b-4712-8c53-072f9f76a548",
+  "databaseServiceId": "833902c9-c63a-4ef3-ada7-365434566378",
+  "region": "europe-west4",
+  "url": "https://cmh-academy-demo-demonstration.up.railway.app",
+  "branch": "feat/demo-camille"
+}

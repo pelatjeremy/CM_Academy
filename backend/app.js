@@ -21,12 +21,16 @@ import { createDocumentStorage } from './lib/documents.js';
 import {normaliserConflitTransaction} from './lib/preinscriptions.js';
 import {createVideoStorage} from './lib/videos.js';
 import {adminVideos,videosStagiaire} from './videos-pedagogiques.js';
+import {serveFrontend} from './lib/frontend.js';
+import {demoStatus} from './admin/demo-status.js';
 
 export async function createApp(options) {
   const { prisma } = options;
   const app = express();
   app.disable('x-powered-by');
+  app.get('/api/configuration-publique',(req,res)=>res.set('Cache-Control','no-store').json({demonstration:options.demo===true}));
   if (options.trustedProxy) app.set('trust proxy', options.trustedProxy);
+  if(options.production)app.use((req,res,next)=>{res.set({'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",'Referrer-Policy':'same-origin','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'});next();});
   app.use(express.json({ limit: '128kb' }));
   app.get('/api/health', (req, res) =>
     res.json({ status: 'ok', message: 'Le serveur CMH Academy fonctionne.' })
@@ -59,8 +63,10 @@ export async function createApp(options) {
     }
   });
   app.use('/api', publicCatalogue(prisma, options.clock));
+  if(options.demo)app.post('/api/sessions/:id/preinscriptions',(req,res)=>res.status(403).json({error:'Les nouvelles demandes sont fermées sur la démonstration. Ne saisissez aucune donnée personnelle.'}));
   app.use('/api', publicPreinscriptions(prisma, options.clock));
   const auth = await configureAuth(app, options);
+  if(options.demo)app.use('/api/admin',demoStatus(prisma,createDocumentStorage(options.documentStorage)));
   const videoStorage=createVideoStorage({root:options.documentStorage?.root,...options.videoStorage});
   app.use('/api/admin', adminVideos(prisma,videoStorage));
   app.use('/api/stagiaire', videosStagiaire(prisma,videoStorage));
@@ -86,6 +92,7 @@ export async function createApp(options) {
     '/api/admin',
     adminFichiers(prisma, createDocumentStorage(options.documentStorage))
   );
+  if(options.frontendDir)serveFrontend(app,options.frontendDir);
   app.use((req, res) => res.status(404).json({ error: 'Route introuvable.' }));
   app.use((error, req, res, next) => {
     error=normaliserConflitTransaction(error);

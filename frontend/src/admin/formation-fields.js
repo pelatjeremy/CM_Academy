@@ -2,7 +2,7 @@ const requiredToPublish = 'Requis pour publier. Peut rester vide dans un brouill
 export const formationSections = [
   { title: '1. Présentation', fields: [
     { name: 'titre', label: 'Titre', required: true, max: 160 },
-    { name: 'slug', label: 'Slug', max: 160, publication: true, hint: `${requiredToPublish} Minuscules, chiffres et tirets simples.` },
+    { name: 'slug', label: 'Adresse de la page', max: 160, publication: true, hint: `${requiredToPublish} Minuscules, chiffres et tirets simples.` },
     { name: 'resume', label: 'Résumé', multiline: true, rows: 3, max: 1000, hint: 'Présentation courte facultative.' },
     { name: 'description', label: 'Description', multiline: true, max: 5000, publication: true, hint: requiredToPublish },
     { name: 'poleId', label: 'Pôle', type: 'select', publication: true, hint: requiredToPublish },

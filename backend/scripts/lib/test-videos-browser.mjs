@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 import path from 'node:path';
 import {chromium} from '@playwright/test';
-import {videoProbeError} from '../../lib/videos.js';
 
 export async function testVideosBrowser({origin,run,adminEmail,adminPassword,pass,prisma}) {
  const fixture=JSON.parse(readFileSync(path.join(run,'videos-browser.json'),'utf8'));
@@ -72,7 +71,7 @@ export async function testVideosBrowser({origin,run,adminEmail,adminPassword,pas
   try {
    process.env.VIDEO_FFPROBE_PATH=path.join(run,'ffprobe-absent.exe');
    await admin.goto(origin+adminPath);await admin.getByRole('button',{name:'Modifier la leçon Préparer une observation',exact:true}).click();
-   await admin.getByText(videoProbeError,{exact:true}).waitFor();
+   await admin.getByText('La vérification des vidéos est indisponible. Contactez la personne chargée de l’hébergement (outil ffprobe).',{exact:true}).waitFor();
    await admin.getByLabel('Choisir un fichier MP4').setInputFiles(fixture.filename);
    assert(await admin.getByRole('button',{name:'Remplacer la vidéo',exact:true}).isDisabled());
   }finally{process.env.VIDEO_FFPROBE_PATH=configuredProbe;}

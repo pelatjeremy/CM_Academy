@@ -1,3 +1,4 @@
+import {formatParis} from './session-time';
 import {useEffect,useRef,useState} from 'react';
 import {adminRequest} from './api';
 import VideoPlayer from '../pedagogie/VideoPlayer';
@@ -42,8 +43,8 @@ export default function VideosLecon({base,videos,maxFileBytes,probeStatus,revisi
  }
  return <section className="admin-attachments" aria-label="Gestion des vidéos et replays">
   <h3>Vidéo ou replay MP4</h3>
-  {probeStatus?.available===false&&<p className="admin-notice error" role="alert">{probeStatus.error}</p>}
-  <p id="video-format">Une vidéo active par leçon, {Math.round(maxFileBytes/1048576)} Mio maximum ({maxFileBytes.toLocaleString('fr-FR')} octets). H.264 8 bits (yuv420p), audio AAC facultatif, export avec démarrage rapide (faststart). Aucun transcodage automatique.</p>
+  {probeStatus?.available===false&&<p className="admin-notice error" role="alert">La vérification des vidéos est indisponible. Contactez la personne chargée de l’hébergement (outil ffprobe).</p>}
+  <p id="video-format">Une vidéo active par leçon, {Math.round(maxFileBytes/1048576)} Mio maximum ({maxFileBytes.toLocaleString('fr-FR')} octets). Export recommandé : MP4 avec démarrage rapide, image H.264 et son AAC facultatif. Le fichier est vérifié avant publication.</p>
   <p>Les remplacements et retraits conservent les versions dans le stockage privé. Pour modifier les informations, déposez une nouvelle version.</p>
   {confirm&&<Confirmation action={confirm} onCancel={()=>setConfirm(null)} onConfirm={execute}/>}
   {error&&<p className="admin-notice error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
@@ -58,6 +59,6 @@ export default function VideosLecon({base,videos,maxFileBytes,probeStatus,revisi
   </fieldset>
   {busy&&<><p role="status">Transfert et validation de la vidéo en cours…</p><button type="button" className="admin-button secondary" onClick={()=>controller.current?.abort()}>Interrompre le transfert</button></>}
   {current?<VideoPlayer key={current.id} video={current} base={base}/>:<p>Aucune vidéo active pour cette leçon.</p>}
-  {!!videos.length&&<details><summary>Historique des versions vidéo</summary><ol>{videos.map(v=><li key={v.id}><strong>Version {v.version} · {v.titre}</strong> · {v.nomOriginal}<p>Déposée le {new Date(v.date).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})} par {v.auteur.email}. {v.retireAt?'Retirée le '+new Date(v.retireAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' par '+v.retirePar.email:'Version active.'}</p><a href={base+'/'+v.id+'/lecture'} target="_blank" rel="noreferrer">Lire la version {v.version} (nouvel onglet privé)</a></li>)}</ol></details>}
+  {!!videos.length&&<details><summary>Historique des versions vidéo</summary><ol>{videos.map(v=><li key={v.id}><strong>Version {v.version} · {v.titre}</strong> · {v.nomOriginal}<p>Déposée le {formatParis(v.date)} par {v.auteur.email}. {v.retireAt?'Retirée le '+formatParis(v.retireAt)+' par '+v.retirePar.email:'Version active.'}</p><a href={base+'/'+v.id+'/lecture'} target="_blank" rel="noreferrer">Lire la version {v.version} (nouvel onglet privé)</a></li>)}</ol></details>}
  </section>;
 }

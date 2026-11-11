@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {dateFr,heureFr,plageFr,dureeFr,dureeMinutesFr} from '../../shared/format-fr.mjs';
+assert.equal(dateFr('2026-11-04T08:00Z'),'4 novembre 2026');
+assert.equal(heureFr('2026-11-04T08:00Z'),'09 h 00');
+assert.equal(heureFr('2026-07-04T07:00Z'),'09 h 00');
+assert.equal(plageFr('2026-11-04T08:00Z','2026-11-04T11:30Z'),'4 novembre 2026 · 09 h 00 – 12 h 30');
+assert.equal(plageFr('2026-10-25T00:30Z','2026-10-25T01:30Z'),'25 octobre 2026 · 02 h 30 (heure d’été) – 02 h 30 (heure d’hiver)');
+assert.equal(dureeMinutesFr(210),'3 h 30');assert.equal(dureeMinutesFr(840),'14 h');assert.equal(dureeMinutesFr(45),'45 min');assert.equal(dureeFr(0),'0 min');assert.equal(dureeFr(90000),'1 min 30 s');assert.equal(dureeFr(null),'Durée à préciser');assert.equal(dateFr(null),'Date à préciser');
+assert.equal(new Date('2026-10-25T01:30Z')-new Date('2026-10-25T00:30Z'),3600000);
+console.log('PASS format français commun : dates, horaires, durées, zéro/inconnu, heure d’été/hiver et instants inchangés');

@@ -36,7 +36,7 @@ export async function testPublicCatalogue({prisma,client,pass}){
   assert.equal((await request(`${root}/${empty.slug}`)).data.formation.tarif,null);assert.equal((await request(`${root}/gratuit-public-test`)).data.formation.tarif,'0.00');
   assert.equal((await request(`${root}/${empty.slug}`)).data.formation.sessions.length,0);
   assert.equal(price(null,'EUR'),'Tarif non renseigné');assert.equal(price('0.00','EUR'),'Gratuit');assert.equal(price('1234.56','EUR'),'1\u202f234,56 EUR');assert.equal(price('9999999999.99','USD'),'9\u202f999\u202f999\u202f999,99 USD');
-  assert.match(parisTime('2026-10-25T00:30:00Z'),/02:30 UTC\+2/);assert.match(parisTime('2026-10-25T01:30:00Z'),/02:30 UTC\+1/);assert.match(parisTime('2027-06-02T07:00:00Z'),/09:00 UTC\+2/);assert.match(parisDate('2027-06-02T07:00:00Z'),/2 juin 2027/);
+  assert.match(parisTime('2026-10-25T00:30:00Z'),/02 h 30/);assert.match(parisTime('2026-10-25T01:30:00Z'),/02 h 30/);assert.match(parisTime('2027-06-02T07:00:00Z'),/09 h 00/);assert.match(parisDate('2027-06-02T07:00:00Z'),/2 juin 2027/);
   pass('public : tarifs exacts absent/gratuit/payant, formatage sans flottants ; heures de Paris été/hiver et absence de session visible');
   async function write(route,body,csrf=true){if(csrf)await admin.token();return admin.request(route,{method:'PUT',headers:{'Content-Type':'application/json',...(csrf?{'x-csrf-token':admin.csrf}:{})},body:JSON.stringify(body)});}
   const readSession=async id=>(await(await admin.request(`/api/admin/sessions/${id}`)).json()).item;

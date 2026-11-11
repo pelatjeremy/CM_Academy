@@ -5,7 +5,7 @@ import QuestionnairesInscription from './QuestionnairesInscription';
 import QuestionnaireReponses from './QuestionnaireReponses';
 import {useEffect,useRef,useState} from 'react';
 import {adminRequest} from '../admin/api';
-import {formatParis} from '../admin/session-time';
+import {formatParis,plageFr} from '../admin/session-time';
 import {statutsInscription,categories} from '../admin/dossier-labels';
 import '../admin/admin.css';
 export default function EspaceStagiaire({user,onLogout,busy,error}){
@@ -19,18 +19,18 @@ export default function EspaceStagiaire({user,onLogout,busy,error}){
 
  const [state,setState]=useState({loading:true}),[attempt,setAttempt]=useState(0);
  useEffect(()=>{
-  document.title='Mes formations — CMH Academy';
+  if(!parcours)document.title=(questionnaireId?'Questionnaire':id?'Ma formation':'Mes formations')+' — Espace stagiaire — CMH Academy';
   const controller=new AbortController();
   adminRequest('/api/stagiaire/inscriptions'+(id?'/'+encodeURIComponent(id):''),{signal:controller.signal})
    .then(data=>{if(!controller.signal.aborted)setState({data});})
    .catch(err=>{if(!controller.signal.aborted)setState({error:err.message});});
   return()=>controller.abort();
- },[id,attempt]);
+ },[id,attempt,parcours,questionnaireId]);
  return <div className="admin-workspace" onClickCapture={navigate}>
   {exit&&<ExitDialog onStay={()=>setExit(null)} onLeave={leave}/>}
   <a className="skip-link" href="#stagiaire-content">Aller au contenu</a>
   <aside className="admin-sidebar"><a className="admin-brand" href="/stagiaire">CMH <span>Academy</span></a><p>Espace stagiaire</p>
-   <nav aria-label="Espace stagiaire"><a href="/stagiaire" aria-current={!id?'page':undefined}>Mes formations</a></nav>
+   <nav aria-label="Espace stagiaire"><a href="/stagiaire" aria-current={!id?'page':undefined}>Mes formations</a>{id&&<><a href={'/stagiaire/inscriptions/'+id} aria-current={!parcours&&!questionnaireId?'page':undefined}>Ma formation</a>{state.data?.item?.statut==='CONFIRMEE'&&<a href={'/stagiaire/inscriptions/'+id+'/parcours'} aria-current={parcours?'page':undefined}>Parcours pédagogique</a>}</>}</nav>
    <div className="admin-account"><p>{user.email}</p><button className="admin-button secondary" disabled={busy} onClick={logout}>Se déconnecter</button><a href="/">Catalogue public</a></div>
   </aside>
   <main className="admin-content" id="stagiaire-content"><h1>{state.data?.item?.session.formation.titre||'Mes formations'}</h1>
@@ -45,7 +45,7 @@ export default function EspaceStagiaire({user,onLogout,busy,error}){
     <QuestionnairesInscription id={id}/>
     <section className="admin-panel"><h2>Votre session</h2><p>Statut : {statutsInscription[state.data.item.statut]}</p><p>{state.data.item.session.formation.description}</p>
     {state.data.item.session.lieu&&<p>Lieu : {state.data.item.session.lieu}</p>}<p>{state.data.item.session.modalitesPratiques}</p>
-    <h3>Séances — heure de Paris</h3>{!state.data.item.session.seances.length?<p>Les horaires seront précisés prochainement.</p>:<ul>{state.data.item.session.seances.map(seance=><li key={seance.id}>{formatParis(seance.debut)} → {formatParis(seance.fin)}</li>)}</ul>}</section>
+    <h3>Séances — heure de Paris</h3>{!state.data.item.session.seances.length?<p>Les horaires seront précisés prochainement.</p>:<ul>{state.data.item.session.seances.map(seance=><li key={seance.id}>{plageFr(seance.debut,seance.fin)}</li>)}</ul>}</section>
     <section className="admin-panel"><h2>Documents partagés</h2>{!state.data.fichiers.length?<p>Aucun document n’a encore été partagé.</p>:<ul className="admin-file-versions">{state.data.fichiers.map(file=><li key={file.id}><p>{categories[file.categorie]} · version {file.version}</p><a download href={'/api/stagiaire/inscriptions/'+id+'/fichiers/'+file.id+'/telecharger'}>{file.nomOriginal}</a><p>{Math.ceil(file.taille/1024)} Ko · {file.typeMime} · {formatParis(file.date)}</p></li>)}</ul>}</section>
    </>)}
   </main>

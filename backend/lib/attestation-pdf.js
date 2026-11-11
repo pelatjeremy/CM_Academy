@@ -1,9 +1,9 @@
 import PDFDocument from 'pdfkit';
 import {fileURLToPath} from 'node:url';
+import {dateFr,plageFr,dureeFr,dureeMinutesFr} from '../../shared/format-fr.mjs';
 const normal=fileURLToPath(new URL('../assets/fonts/Vera.ttf',import.meta.url));
 const bold=fileURLToPath(new URL('../assets/fonts/VeraBd.ttf',import.meta.url));
-const date=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'shortOffset'});
-export function dureeExacte(ms){const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=ms%60000/1000;return `${h} h ${String(m).padStart(2,'0')} min${s?' '+s.toLocaleString('fr-FR',{maximumFractionDigits:3})+' s':''}`;}
+export const dureeExacte=dureeFr;
 export async function genererAttestation(d,{brouillon=false,reference,dateEmission=new Date(),fields={}}={}){
  const doc=new PDFDocument({size:'A4',margins:{top:56,bottom:64,left:56,right:56},bufferPages:true,info:{Title:brouillon?'Brouillon d’attestation':'Attestation individuelle de fin de formation',Author:d.organisme.denomination||'Organisme non renseigné',Creator:'CMH Academy'}});
  const chunks=[];let size=0;
@@ -15,15 +15,15 @@ export async function genererAttestation(d,{brouillon=false,reference,dateEmissi
  text(brouillon?'BROUILLON - NON ÉMIS':'ATTESTATION INDIVIDUELLE',{title:true,size:11,color:'#7c5d2d'});
  text(d.dureeSuivieMs<d.dureeProgrammeeMs?'Fin de formation - participation partielle':'Fin de formation',{title:true,size:23});
  text(brouillon?'Aperçu sans valeur d’émission':`Référence : ${reference}`);
- text(`Date ${brouillon?'de l’aperçu':'d’émission'} : ${date(dateEmission)} (Europe/Paris)`);
+ text(`Date ${brouillon?'de l’aperçu':'d’émission'} : ${dateFr(dateEmission)} (heure de Paris)`);
  if(brouillon&&Object.keys(fields).length)section('Informations à compléter avant émission',Object.values(fields).join('\n'));
  section('Organisme',[d.organisme.denomination||'Dénomination à renseigner',d.organisme.adresse||'Adresse à renseigner',d.organisme.identifiant&&'Identifiant : '+d.organisme.identifiant,d.organisme.representant&&'Représentant déclaré : '+d.organisme.representant].filter(Boolean).join('\n'));
  section('Stagiaire',d.identite.prenom+' '+d.identite.nom);
  section('Formation',d.formation.titre);
  const formats={PRESENTIEL:'Présentiel',WEBINAIRE:'Webinaire',HYBRIDE:'Hybride'};
  section('Modalités de réalisation',[formats[d.formation.format]||'Format à renseigner',d.lieu&&'Lieu : '+d.lieu].filter(Boolean).join('\n'));
- section('Dates et horaires - Europe/Paris',d.seances.map(s=>date(s.debut)+' à '+date(s.fin)).join('\n')||'Dates à renseigner');
- section('Durées',`Durée programmée (séances) : ${dureeExacte(d.dureeProgrammeeMs)}\nDurée de présence renseignée : ${dureeExacte(d.dureeSuivieMs)}${fields.presences?' (relevé incomplet)':''}`);
+ section('Dates et horaires - heure de Paris',d.seances.map(s=>plageFr(s.debut,s.fin)).join('\n')||'Dates à renseigner');
+ section('Durées',`Durée pédagogique de la formation : ${dureeMinutesFr(d.formation.dureeMinutes)}\nHeures programmées (séances) : ${dureeExacte(d.dureeProgrammeeMs)}\nHeures de présence renseignées : ${dureeExacte(d.dureeSuivieMs)}${fields.presences?' (relevé incomplet)':''}`);
  section('Objectifs pédagogiques',d.formation.objectifs);
  section('Origine des informations','Présences renseignées manuellement par l’administration. Cette attestation reprend les données enregistrées ; elle ne déclare ni résultat d’évaluation, ni acquis, ni signature électronique.');
  text('Modèle : '+d.modeleVersion,{size:8,color:'#52665e'});

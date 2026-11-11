@@ -28,7 +28,11 @@
     "test:concurrence-inscriptions": "node scripts/test-auth.mjs --inscriptions --stress-inscriptions",
     "test:videos": "node scripts/test-auth.mjs --catalogue --formations --sessions --public --inscriptions --dossiers --documents --stagiaires --questionnaires --presences --attestations --elearning --videos",
     "test:videos:browser": "node scripts/test-auth.mjs --catalogue --formations --sessions --public --inscriptions --dossiers --documents --stagiaires --questionnaires --presences --attestations --elearning --videos --video-browser",
-    "test:videos:schema": "node scripts/test-videos-schema.mjs"
+    "test:videos:schema": "node scripts/test-videos-schema.mjs",
+    "test:format": "node scripts/test-format-fr.mjs",
+    "test:demo": "node scripts/test-demo.mjs",
+    "demo:migrate": "node scripts/migrate-demo.mjs",
+    "demo:seed": "node scripts/seed-demo.mjs --confirm-demo-only"
   },
   "keywords": [],
   "author": "",
@@ -50,11 +54,11 @@
     "multer": "^2.5.0",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.1",
+    "prisma": "^7.10.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",
-    "ffmpeg-ffprobe-static": "6.1.2-rc.1",
-    "prisma": "^7.10.1"
+    "ffmpeg-ffprobe-static": "6.1.2-rc.1"
   }
 }

@@ -1,3 +1,4 @@
+import {formatParis} from './session-time';
 import {useEffect,useRef,useState} from 'react';
 import {adminRequest} from './api';
 import {FormField} from './CatalogueResource';
@@ -43,7 +44,7 @@ export default function ContenuPedagogique({id,setDirty}){
    <button className="admin-button" disabled={busy||conflict||videoDirty}>{busy?'Enregistrement…':'Enregistrer le contenu'}</button></fieldset></form>
    {editor.kind==='lecon'&&editor.id&&<VideosLecon key={editor.id} base={base+'/lecons/'+editor.id+'/videos'} videos={lesson?.videos||[]} maxFileBytes={data.videoMaxFileBytes} probeStatus={data.videoProbe} revision={editor.revision} disabled={busy||editorDirty||!!file||conflict} onDirty={setVideoDirty} onSaved={async revision=>{await refresh();setEditor(e=>({...e,revision}));}}/>}
    {editor.kind==='lecon'&&editor.id&&<section className="admin-attachments"><h3>Supports PDF</h3><p>PDF uniquement, limite documentaire configurée côté serveur. Enregistrez la leçon avant un dépôt.</p><label className="admin-label" htmlFor="support-pedagogique">Choisir un support PDF</label><input ref={fileInput} id="support-pedagogique" type="file" accept=".pdf,application/pdf" disabled={busy||editorDirty||videoDirty||conflict} onChange={e=>{setFile(e.target.files[0]||null);depot.current=crypto.randomUUID();setMessage('');}}/><button className="admin-button secondary" disabled={busy||!file||editorDirty||videoDirty||conflict} onClick={upload}>{busy?'Traitement…':'Ajouter le support'}</button>
-    {!lesson?.supports.length?<p>Aucun support.</p>:<ul className="admin-file-versions">{lesson.supports.map(s=><li key={s.id}><a download href={base+'/lecons/'+editor.id+'/supports/'+s.id+'/telecharger'}>{s.nomOriginal}</a><p>{Math.ceil(s.taille/1024)} Ko · PDF · {s.auteur.email} · {new Date(s.date).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})}</p><p>{s.archive?'Archivé':'Accessible lorsque la leçon est accessible'}</p><button className="admin-button secondary" disabled={busy||dirty} onClick={()=>archiveSupport(s)}>{s.archive?'Rétablir le support':'Archiver le support'}</button></li>)}</ul>}
+    {!lesson?.supports.length?<p>Aucun support.</p>:<ul className="admin-file-versions">{lesson.supports.map(s=><li key={s.id}><a download href={base+'/lecons/'+editor.id+'/supports/'+s.id+'/telecharger'}>{s.nomOriginal}</a><p>{Math.ceil(s.taille/1024)} Ko · PDF · {s.auteur.email} · {formatParis(s.date)}</p><p>{s.archive?'Archivé':'Accessible lorsque la leçon est accessible'}</p><button className="admin-button secondary" disabled={busy||dirty} onClick={()=>archiveSupport(s)}>{s.archive?'Rétablir le support':'Archiver le support'}</button></li>)}</ul>}
    </section>}
   </>}</section></div>}
  </>;

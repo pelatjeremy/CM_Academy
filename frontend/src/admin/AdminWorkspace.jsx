@@ -35,7 +35,7 @@ export default function AdminWorkspace({ user, onLogout, busy, error }) {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
-  useEffect(() => { document.title = `${contenuPedagogique ? 'Contenu pédagogique' : organisme ? 'Organisme' : questionnaires ? 'Questionnaires' : dossier ? 'Dossier administratif' : inscriptions ? 'Inscriptions' : kind ? resources[kind].title : 'Tableau de bord'} — Administration CMH Academy`; }, [kind, inscriptions, dossier, questionnaires, organisme, contenuPedagogique]);
+  useEffect(() => { document.title = `${presences ? 'Présences de la session' : contenuPedagogique ? 'Contenu pédagogique' : organisme ? 'Organisme' : questionnaires ? 'Questionnaires' : dossier ? 'Dossier administratif' : inscriptions ? 'Inscriptions' : kind ? resources[kind].title : 'Tableau de bord'} — Administration CMH Academy`; }, [kind, inscriptions, dossier, questionnaires, organisme, contenuPedagogique, presences]);
   async function logout() {
     if (dirty) { setExit({ logout: true }); return; }
     allowExit.current = true;

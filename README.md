@@ -1,5 +1,12 @@
 # CMH Academy — socle local
 
+## Démonstration Camille
+
+La branche `feat/demo-camille` prépare une démonstration fictive indépendante,
+avec formatage français commun, frontend de production, base PostgreSQL et
+stockage privés dédiés. Voir [la procédure de déploiement et le scénario](deploy/README.md).
+Les configurations remplies, médias, sauvegardes et accès privés restent hors Git.
+
 ## Vidéos et replays — branche de développement
 
 Gestion ADMIN de MP4 privés par version, lecteur protégé avec Range/HEAD,

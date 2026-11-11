@@ -23,8 +23,8 @@ for name, draft in [('attestation-brouillon.pdf', True), ('attestation-stagiaire
             if draft:
                 assert 'BROUILLON' in texts[i]
         for expected in ['Éléonore Recette', 'CMH Recette', 'Observer et accompagner le cheval',
-                         '14 h 00 min', '12 h 00 min', 'participation partielle',
-                         'Europe/Paris', 'manuellement', 'Objectifs pédagogiques']:
+                         '14 h', '12 h', 'participation partielle',
+                         'heure de Paris', 'manuellement', 'Objectifs pédagogiques']:
             assert expected in text, f'Contenu manquant : {expected}'
         for forbidden in ['Note interne', 'Financeur fictif', 'noe@recette.invalid',
                           'eleonore@recette.invalid', 'Mieux observer le cheval']:

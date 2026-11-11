@@ -6,7 +6,7 @@ export const resources = {
     description: 'Organisez les domaines de formation de CMH Academy.',
     fields: [
       { name: 'titre', label: 'Titre', required: true, max: 160 },
-      { name: 'slug', label: 'Slug', required: true, max: 160, hint: 'Minuscules, chiffres et tirets simples, par exemple commerce-du-cheval.' },
+      { name: 'slug', label: 'Adresse de la page', required: true, max: 160, hint: 'Minuscules, chiffres et tirets simples, par exemple commerce-du-cheval.' },
       { name: 'description', label: 'Description', multiline: true, max: 3000 },
     ] },
   formateurs: { title: 'Formateurs', singular: 'formateur', name: 'nom', summary: 'biographie',

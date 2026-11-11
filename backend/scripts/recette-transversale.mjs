@@ -57,7 +57,7 @@ async function api(c,url,body,status=200,method=body===undefined?'GET':'POST'){
 async function startBrowser(){
  const frontend=path.resolve(backend,'../frontend'),require=createRequire(path.join(frontend,'package.json'));
  const {createServer}=await import(pathToFileURL(require.resolve('vite')).href),{default:react}=await import(pathToFileURL(require.resolve('@vitejs/plugin-react')).href);
- vite=await createServer({configFile:false,root:frontend,plugins:[react()],server:{host:'127.0.0.2',port:0,proxy:{'/api':{target:apiBase,changeOrigin:true}}}});await vite.listen();
+ vite=await createServer({configFile:false,root:frontend,plugins:[react()],server:{fs:{allow:[frontend,path.resolve(backend,'../shared')]},host:'127.0.0.2',port:0,proxy:{'/api':{target:apiBase,changeOrigin:true}}}});await vite.listen();
  browserOrigin='http://127.0.0.2:'+vite.httpServer.address().port;
  await stopApi();await startApi();
  writeFileSync(path.join(fixture.run,'browser.json'),JSON.stringify({origin:browserOrigin,adminEmail:'admin@recette.invalid',password,stagiaireEmail:'eleonore@recette.invalid',stagiairePassword}),{mode:0o600});
