@@ -1,0 +1,536 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Formation {
+  id                   String               @id @default(cuid())
+  titre                String
+  description          String               @default("")
+  publiee              Boolean              @default(false)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  slug                 String?              @unique
+  resume               String               @default("")
+  objectifs            String               @default("")
+  programme            String               @default("")
+  publicVise           String               @default("")
+  prerequis            String               @default("")
+  dureeMinutes         Int?
+  format               FormatFormation?
+  tarif                Decimal?             @db.Decimal(12, 2)
+  devise               String               @default("EUR") @db.Char(3)
+  financement          String               @default("")
+  parcoursDocumentaire Boolean              @default(false)
+  poleId               String?
+  pole                 Pole?                @relation(fields: [poleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  formateurs           FormationFormateur[]
+  sessions             Session[]
+  parcoursPedagogique ParcoursPedagogique?
+  modulesPedagogiques ModulePedagogique[]
+
+  @@index([poleId])
+}
+
+enum FormatFormation {
+  WEBINAIRE
+  PRESENTIEL
+  HYBRIDE
+}
+
+model Pole {
+  id          String      @id @default(cuid())
+  titre       String
+  slug        String      @unique
+  description String      @default("")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  formations  Formation[]
+}
+
+model Formateur {
+  id         String               @id @default(cuid())
+  nom        String
+  biographie String               @default("")
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  formations FormationFormateur[]
+}
+
+model FormationFormateur {
+  formationId String
+  formateurId String
+  formation   Formation @relation(fields: [formationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  formateur   Formateur @relation(fields: [formateurId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([formationId, formateurId])
+  @@index([formateurId])
+}
+
+model Session {
+  id                 String             @id @default(cuid())
+  formationId        String
+  capacite           Int?
+  lieu               String?
+  modalitesPratiques String             @default("")
+  fuseauHoraire      String             @default("Europe/Paris")
+  visiblePubliquement Boolean           @default(false)
+  preinscriptionsOuvertes Boolean       @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  formation          Formation          @relation(fields: [formationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  seances            Seance[]
+  accesPrive         SessionAccesPrive?
+  inscriptions       Inscription[]
+
+  @@index([formationId])
+}
+
+model Seance {
+  id        String   @id @default(cuid())
+  sessionId String
+  debut     DateTime @db.Timestamptz(3)
+  fin       DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  presences Presence[]
+
+  @@index([sessionId, debut])
+}
+
+// Accès interne uniquement : ne jamais inclure cette relation dans un DTO public.
+model SessionAccesPrive {
+  sessionId           String   @id
+  lienVisioconference String?
+  consignes           String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  session             Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+enum RoleUtilisateur {
+  ADMIN
+  STAGIAIRE
+  MEMBRE
+}
+
+model Utilisateur {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  motDePasseHash String
+  role           RoleUtilisateur @default(MEMBRE)
+  actif          Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  changementsInscription ChangementInscription[]
+  changementsDocumentaires ChangementDocumentaire[]
+  piecesJointes            PieceJointe[]
+  invitationsCreees InvitationStagiaire[] @relation("InvitationsAuteur")
+  invitationsUtilisees InvitationStagiaire[] @relation("InvitationsCompte")
+  rattachements RattachementStagiaire[]
+  partages PartagePieceJointe[]
+  modelesCrees ModeleQuestionnaire[] @relation("ModeleAuteur")
+  modelesModifies ModeleQuestionnaire[] @relation("ModeleModificateur")
+  questionnairesAttribues QuestionnaireAttribue[] @relation("QuestionnaireAuteur")
+  questionnairesRetires QuestionnaireAttribue[] @relation("QuestionnaireRetrait")
+  questionnairesSoumis QuestionnaireAttribue[] @relation("QuestionnaireSoumission")
+  questionnairesBrouillons QuestionnaireAttribue[] @relation("QuestionnaireBrouillon")
+  presencesModifiees Presence[]
+  changementsPresence ChangementPresence[]
+  organismesModifies OrganismeAttestation[]
+  attestationsEmises AttestationEmission[]
+  supportsPedagogiques SupportLecon[]
+}
+
+enum TypeDemandeInscription {
+  PARTICULIER
+  PROFESSIONNEL_FINANCEMENT
+}
+
+enum StatutInscription {
+  EN_ATTENTE
+  CONFIRMEE
+  REFUSEE
+  ANNULEE
+}
+
+model Inscription {
+  id                  String                @id @default(cuid())
+  sessionId           String
+  prenom              String
+  nom                 String
+  email               String
+  typeDemande         TypeDemandeInscription
+  organismeEnvisage   String?
+  statut              StatutInscription     @default(EN_ATTENTE)
+  createdAt           DateTime              @default(now())
+  session             Session               @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  historique          ChangementInscription[]
+  dossier             DossierAdministratif?
+  invitations InvitationStagiaire[]
+  rattachement RattachementStagiaire?
+  presences Presence[]
+  progressions ProgressionLecon[]
+
+  @@unique([sessionId, email])
+  @@index([sessionId, statut])
+}
+
+model ParcoursPedagogique {
+ formationId String @id
+ revision Int @default(1)
+ updatedAt DateTime @updatedAt
+ formation Formation @relation(fields:[formationId],references:[id],onDelete:Restrict)
+}
+model ModulePedagogique {
+ id String @id @default(cuid())
+ formationId String
+ titre String @db.VarChar(160)
+ ordre Int
+ publie Boolean @default(false)
+ archive Boolean @default(false)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ formation Formation @relation(fields:[formationId],references:[id],onDelete:Restrict)
+ lecons LeconPedagogique[]
+ @@unique([formationId,ordre])
+}
+model LeconPedagogique {
+ id String @id @default(cuid())
+ moduleId String
+ titre String @db.VarChar(160)
+ contenu String @default("")
+ ordre Int
+ publie Boolean @default(false)
+ archive Boolean @default(false)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ module ModulePedagogique @relation(fields:[moduleId],references:[id],onDelete:Restrict)
+ supports SupportLecon[]
+ progressions ProgressionLecon[]
+ @@unique([moduleId,ordre])
+}
+model SupportLecon {
+ id String @id @default(cuid())
+ leconId String
+ depotId String @unique @db.Uuid
+ stockageKey String @unique @db.Uuid
+ nomOriginal String @db.VarChar(255)
+ taille Int
+ typeMime String @db.VarChar(32)
+ empreinte String @db.Char(64)
+ archive Boolean @default(false)
+ date DateTime @default(now())
+ auteurId String
+ lecon LeconPedagogique @relation(fields:[leconId],references:[id],onDelete:Restrict)
+ auteur Utilisateur @relation(fields:[auteurId],references:[id],onDelete:Restrict)
+ @@index([leconId])
+ @@index([auteurId])
+}
+model ProgressionLecon {
+ inscriptionId String
+ leconId String
+ terminee Boolean @default(false)
+ revision Int @default(1)
+ termineeAt DateTime?
+ updatedAt DateTime @updatedAt
+ inscription Inscription @relation(fields:[inscriptionId],references:[id],onDelete:Restrict)
+ lecon LeconPedagogique @relation(fields:[leconId],references:[id],onDelete:Restrict)
+ @@id([inscriptionId,leconId])
+ @@index([leconId])
+}
+
+enum CategorieDocumentaire {
+  ENTRETIEN_INITIAL
+  POSITIONNEMENT
+  CONVENTION_CONTRAT
+  REGLEMENT_INTERIEUR
+  PROGRAMME
+  EMARGEMENT
+  EVALUATIONS
+  SATISFACTION_CHAUD
+  SATISFACTION_FROID
+  ATTESTATION
+}
+
+enum EtatDocumentaire {
+  A_PREPARER
+  EN_ATTENTE
+  RECU
+  VERIFIE
+  NON_APPLICABLE
+}
+
+model DossierAdministratif {
+  inscriptionId         String   @id
+  parcoursDocumentaire   Boolean
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  inscription           Inscription @relation(fields: [inscriptionId], references: [id], onDelete: Restrict)
+  elements              ElementDocumentaire[]
+  questionnaires QuestionnaireAttribue[]
+  attestations AttestationEmission[]
+}
+
+model ElementDocumentaire {
+  inscriptionId String
+  categorie     CategorieDocumentaire
+  etat          EtatDocumentaire @default(A_PREPARER)
+  note          String @default("") @db.VarChar(500)
+  fichierRevision Int @default(0)
+  dossier       DossierAdministratif @relation(fields: [inscriptionId], references: [inscriptionId], onDelete: Restrict)
+  historique    ChangementDocumentaire[]
+  fichiers      PieceJointe[]
+
+  @@id([inscriptionId, categorie])
+}
+
+model PieceJointe {
+  id            String @id @default(cuid())
+  inscriptionId String
+  categorie     CategorieDocumentaire
+  version       Int
+  depotId       String @unique @db.Uuid
+  stockageKey   String @unique @db.Uuid
+  nomOriginal   String @db.VarChar(255)
+  taille        Int
+  typeMime      String @db.VarChar(32)
+  partageStagiaire Boolean @default(false)
+  partageRevision Int @default(0)
+  historiquePartages PartagePieceJointe[]
+  empreinte     String @db.Char(64)
+  date          DateTime @default(now())
+  auteurId      String
+  element       ElementDocumentaire @relation(fields: [inscriptionId, categorie], references: [inscriptionId, categorie], onDelete: Restrict)
+  auteur        Utilisateur @relation(fields: [auteurId], references: [id], onDelete: Restrict)
+  attestation AttestationEmission?
+
+  @@unique([inscriptionId, categorie, version])
+  @@index([auteurId])
+}
+
+model OrganismeAttestation {
+ id String @id @default("principal")
+ denomination String @db.VarChar(200)
+ adresse String @db.VarChar(1000)
+ identifiant String @default("") @db.VarChar(100)
+ representant String @default("") @db.VarChar(200)
+ revision Int @default(1)
+ updatedAt DateTime @updatedAt
+ modifieParId String
+ modifiePar Utilisateur @relation(fields:[modifieParId],references:[id],onDelete:Restrict)
+ @@index([modifieParId])
+}
+
+model AttestationEmission {
+ id String @id @default(cuid())
+ inscriptionId String
+ pieceJointeId String @unique
+ requeteId String @unique @db.Uuid
+ empreinteRequete String @db.Char(64)
+ reference String @unique @db.VarChar(64)
+ numero Int
+ courante Boolean @default(true)
+ modeleVersion String @db.VarChar(32)
+ donnees Json
+ motif String @default("") @db.VarChar(500)
+ date DateTime @default(now())
+ auteurId String
+ dossier DossierAdministratif @relation(fields:[inscriptionId],references:[inscriptionId],onDelete:Restrict)
+ pieceJointe PieceJointe @relation(fields:[pieceJointeId],references:[id],onDelete:Restrict)
+ auteur Utilisateur @relation(fields:[auteurId],references:[id],onDelete:Restrict)
+ @@unique([inscriptionId,numero])
+ @@index([auteurId])
+}
+
+model ChangementDocumentaire {
+  id            String @id @default(cuid())
+  inscriptionId String
+  categorie     CategorieDocumentaire
+  ancienEtat    EtatDocumentaire
+  nouvelEtat    EtatDocumentaire
+  ancienneNote  String @db.VarChar(500)
+  nouvelleNote  String @db.VarChar(500)
+  date          DateTime @default(now())
+  auteurId      String
+  element       ElementDocumentaire @relation(fields: [inscriptionId, categorie], references: [inscriptionId, categorie], onDelete: Restrict)
+  auteur        Utilisateur @relation(fields: [auteurId], references: [id], onDelete: Restrict)
+
+  @@index([inscriptionId, categorie, date])
+  @@index([auteurId])
+}
+
+model ChangementInscription {
+  id            String             @id @default(cuid())
+  inscriptionId String
+  ancienStatut  StatutInscription?
+  nouveauStatut StatutInscription
+  date          DateTime           @default(now())
+  auteurId      String?
+  inscription   Inscription        @relation(fields: [inscriptionId], references: [id], onDelete: Restrict)
+  auteur        Utilisateur?       @relation(fields: [auteurId], references: [id], onDelete: Restrict)
+
+  @@index([inscriptionId, date])
+  @@index([auteurId])
+}
+
+// État serveur géré par connect-pg-simple, sans mot de passe.
+model AuthSession {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire])
+}
+
+model InvitationStagiaire {
+ id String @id @default(cuid())
+ inscriptionId String
+ email String
+ empreinte String @unique @db.Char(64)
+ createdAt DateTime @default(now())
+ expireAt DateTime
+ revoqueeAt DateTime?
+ utiliseeAt DateTime?
+ auteurId String
+ utilisateurId String?
+ inscription Inscription @relation(fields:[inscriptionId],references:[id],onDelete:Restrict)
+ auteur Utilisateur @relation("InvitationsAuteur",fields:[auteurId],references:[id],onDelete:Restrict)
+ utilisateur Utilisateur? @relation("InvitationsCompte",fields:[utilisateurId],references:[id],onDelete:Restrict)
+ rattachement RattachementStagiaire?
+ @@index([inscriptionId,createdAt])
+ @@index([auteurId])
+ @@index([utilisateurId])
+}
+model RattachementStagiaire {
+ inscriptionId String @id
+ utilisateurId String
+ invitationId String @unique
+ createdAt DateTime @default(now())
+ inscription Inscription @relation(fields:[inscriptionId],references:[id],onDelete:Restrict)
+ utilisateur Utilisateur @relation(fields:[utilisateurId],references:[id],onDelete:Restrict)
+ invitation InvitationStagiaire @relation(fields:[invitationId],references:[id],onDelete:Restrict)
+ @@index([utilisateurId])
+}
+model PartagePieceJointe {
+ id String @id @default(cuid())
+ fichierId String
+ partage Boolean
+ date DateTime @default(now())
+ auteurId String
+ fichier PieceJointe @relation(fields:[fichierId],references:[id],onDelete:Restrict)
+ auteur Utilisateur @relation(fields:[auteurId],references:[id],onDelete:Restrict)
+ @@index([fichierId,date])
+ @@index([auteurId])
+}
+
+enum CategorieQuestionnaire {
+ POSITIONNEMENT
+ SATISFACTION_CHAUD
+ SATISFACTION_FROID
+}
+enum EtatQuestionnaire {
+ A_COMPLETER
+ BROUILLON
+ ENVOYE
+ RETIRE
+}
+model ModeleQuestionnaire {
+ id String @id @default(cuid())
+ titre String @db.VarChar(160)
+ categorie CategorieQuestionnaire
+ questions Json @default("[]")
+ valide Boolean @default(false)
+ revision Int @default(0)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ auteurId String
+ modifieParId String
+ auteur Utilisateur @relation("ModeleAuteur",fields:[auteurId],references:[id],onDelete:Restrict)
+ modifiePar Utilisateur @relation("ModeleModificateur",fields:[modifieParId],references:[id],onDelete:Restrict)
+ attributions QuestionnaireAttribue[]
+ @@index([auteurId])
+ @@index([modifieParId])
+}
+model QuestionnaireAttribue {
+ id String @id @default(cuid())
+ inscriptionId String
+ modeleId String
+ modeleRevision Int
+ requeteId String @unique @db.Uuid
+ titre String @db.VarChar(160)
+ categorie CategorieQuestionnaire
+ questions Json
+ reponses Json @default("{}")
+ etat EtatQuestionnaire @default(A_COMPLETER)
+ revision Int @default(0)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ auteurId String
+ retireAt DateTime?
+ retireParId String?
+ soumisAt DateTime?
+ soumisParId String?
+ brouillonAt DateTime?
+ brouillonParId String?
+ dossier DossierAdministratif @relation(fields:[inscriptionId],references:[inscriptionId],onDelete:Restrict)
+ modele ModeleQuestionnaire @relation(fields:[modeleId],references:[id],onDelete:Restrict)
+ auteur Utilisateur @relation("QuestionnaireAuteur",fields:[auteurId],references:[id],onDelete:Restrict)
+ retirePar Utilisateur? @relation("QuestionnaireRetrait",fields:[retireParId],references:[id],onDelete:Restrict)
+ soumisPar Utilisateur? @relation("QuestionnaireSoumission",fields:[soumisParId],references:[id],onDelete:Restrict)
+ brouillonPar Utilisateur? @relation("QuestionnaireBrouillon",fields:[brouillonParId],references:[id],onDelete:Restrict)
+ @@index([inscriptionId,createdAt])
+ @@index([modeleId])
+ @@index([auteurId])
+ @@index([retireParId])
+ @@index([soumisParId])
+ @@index([brouillonParId])
+}
+
+enum EtatPresence {
+ NON_RENSEIGNE
+ PRESENT
+ PARTIEL
+ ABSENT
+}
+model Presence {
+ inscriptionId String
+ seanceId String
+ etat EtatPresence
+ dureeSuivieMs BigInt?
+ debut DateTime @db.Timestamptz(3)
+ fin DateTime @db.Timestamptz(3)
+ revision Int @default(1)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ modifieParId String
+ motifCorrection String @default("") @db.VarChar(500)
+ inscription Inscription @relation(fields:[inscriptionId],references:[id],onDelete:Restrict)
+ seance Seance @relation(fields:[seanceId],references:[id],onDelete:Restrict)
+ modifiePar Utilisateur @relation(fields:[modifieParId],references:[id],onDelete:Restrict)
+ historique ChangementPresence[]
+ @@id([inscriptionId,seanceId])
+ @@index([seanceId])
+ @@index([modifieParId])
+}
+model ChangementPresence {
+ id String @id @default(cuid())
+ inscriptionId String
+ seanceId String
+ ancienEtat EtatPresence?
+ nouvelEtat EtatPresence
+ ancienneDureeMs BigInt?
+ nouvelleDureeMs BigInt?
+ motif String @default("") @db.VarChar(500)
+ date DateTime @default(now())
+ auteurId String
+ presence Presence @relation(fields:[inscriptionId,seanceId],references:[inscriptionId,seanceId],onDelete:Restrict)
+ auteur Utilisateur @relation(fields:[auteurId],references:[id],onDelete:Restrict)
+ @@index([inscriptionId,seanceId,date])
+ @@index([auteurId])
+}

@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync,writeFileSync} from 'node:fs';
+import {randomUUID} from 'node:crypto';
+import path from 'node:path';
+import {isolatedDb,backend} from './lib/isolated-db.mjs';
+const target='20261109200000_questionnaires';let db;const results=[];
+try{
+ db=await isolatedDb();await db.guard();const directory=path.join(backend,'prisma/migrations');
+ for(const name of readdirSync(directory).filter(n=>n!=='migration_lock.toml'&&n<target).sort())await db.sql(readFileSync(path.join(directory,name,'migration.sql'),'utf8'));
+ await db.sql(`INSERT INTO "Utilisateur" (id,email,"motDePasseHash",role,"updatedAt") VALUES ('a','admin@sql.invalid','hash','ADMIN',now()),('u','stagiaire@sql.invalid','hash','STAGIAIRE',now());
+ INSERT INTO "Formation" (id,titre,"updatedAt") VALUES ('f','Formation conservée',now());
+ INSERT INTO "Session" (id,"formationId","updatedAt") VALUES ('s','f',now());
+ INSERT INTO "Inscription" (id,"sessionId",prenom,nom,email,"typeDemande") VALUES ('i','s','A','B','stagiaire@sql.invalid','PARTICULIER');
+ INSERT INTO "DossierAdministratif" ("inscriptionId","parcoursDocumentaire","updatedAt") VALUES ('i',false,now());`);
+ const before=(await db.sql('SELECT * FROM "Inscription"')).rows;
+ const migration=readFileSync(path.join(directory,target,'migration.sql'),'utf8');await db.sql(migration);
+ assert.deepEqual((await db.sql('SELECT * FROM "Inscription"')).rows,before);assert.equal((await db.sql('SELECT count(*)::int AS n FROM "QuestionnaireAttribue"')).rows[0].n,0);
+ await db.sql(readFileSync(path.join(directory,'20261109210000_presences_manuelles','migration.sql'),'utf8'));
+ const config=path.join(db.run,'questionnaires.config.ts');writeFileSync(config,`import {defineConfig,env} from 'prisma/config';export default defineConfig({schema:${JSON.stringify(path.join(backend,'prisma/schema.prisma'))},datasource:{url:env('QUESTIONNAIRE_TEST_URL')}});`);
+ db.command(process.execPath,[path.join(backend,'node_modules/prisma/build/index.js'),'migrate','diff','--from-config-datasource','--to-schema',path.join(backend,'prisma/schema.prisma'),'--exit-code','--config',config],{QUESTIONNAIRE_TEST_URL:db.connectionString});
+ results.push('migration réelle sans divergence et données préexistantes conservées, aucun questionnaire attribué implicitement');
+ const q=JSON.stringify([{id:randomUUID(),type:'TEXTE_COURT',libelle:'Question',obligatoire:true,choix:[]}]);
+ await db.sql('INSERT INTO "ModeleQuestionnaire" (id,titre,categorie,questions,"auteurId","modifieParId","updatedAt") VALUES (\'m\',\'Positionnement\',\'POSITIONNEMENT\',$1,\'a\',\'a\',now())',[q]);
+ const insert=(id,key)=>db.sql('INSERT INTO "QuestionnaireAttribue" (id,"inscriptionId","modeleId","modeleRevision","requeteId",titre,categorie,questions,"auteurId","updatedAt") VALUES ($1,\'i\',\'m\',0,$2,\'Positionnement\',\'POSITIONNEMENT\',$3,\'a\',now())',[id,key,q]);
+ const key=randomUUID();await insert('q1',key);
+ await assert.rejects(()=>insert('q2',randomUUID()),e=>e.code==='23505');
+ await assert.rejects(()=>db.sql('UPDATE "QuestionnaireAttribue" SET etat=\'ENVOYE\''),e=>e.code==='23514');
+ await assert.rejects(()=>db.sql('UPDATE "QuestionnaireAttribue" SET revision=-1'),e=>e.code==='23514');
+ await assert.rejects(()=>db.sql('UPDATE "QuestionnaireAttribue" SET reponses=\'[]\''),e=>e.code==='23514');
+ await assert.rejects(()=>db.sql('DELETE FROM "ModeleQuestionnaire"'),e=>e.code==='23001');
+ await assert.rejects(()=>db.sql('DELETE FROM "DossierAdministratif"'),e=>e.code==='23001');
+ await db.sql('UPDATE "QuestionnaireAttribue" SET etat=\'RETIRE\',"retireAt"=now(),"retireParId"=\'a\'');
+ await insert('q2',randomUUID());
+ await assert.rejects(()=>insert('q3',key),e=>e.code==='23505');
+ await db.sql(readFileSync(path.join(backend,'prisma/rollbacks/20261109210000_presences_manuelles.sql'),'utf8'));
+ const down=readFileSync(path.join(backend,'prisma/rollbacks',target+'.sql'),'utf8');await assert.rejects(()=>db.sql(down),e=>e.code==='P0001');await db.rollback();
+ results.push('unicité de requête et attribution active, cohérence états/dates/auteurs, JSON, révisions et suppressions RESTRICT');
+ await db.sql('DELETE FROM "QuestionnaireAttribue";DELETE FROM "ModeleQuestionnaire";');await db.sql(down);await db.sql(migration);
+ assert.deepEqual((await db.sql('SELECT * FROM "Inscription"')).rows,before);results.push('rollback protégé puis retour arrière/réapplication isolés sans perte des données antérieures');
+ console.log('PASS '+results.join('\nPASS '));
+}catch(error){console.error('FAIL SQL questionnaires : '+(error.code||error.name));process.exitCode=1;}
+finally{if(db){await db.close();writeFileSync(path.join(db.run,'questionnaires-schema-results.json'),JSON.stringify({success:!process.exitCode,results},null,2));console.log('Résultats : '+db.run);}}

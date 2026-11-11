@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync,writeFileSync} from 'node:fs';
+import path from 'node:path';
+import {isolatedDb,backend} from './lib/isolated-db.mjs';
+let db;const results=[];const target='20261109190000_espace_stagiaire';
+try{
+ db=await isolatedDb();await db.guard();
+ const directory=path.join(backend,'prisma/migrations');
+ for(const name of readdirSync(directory).filter(n=>n!=='migration_lock.toml'&&n<target).sort())await db.sql(readFileSync(path.join(directory,name,'migration.sql'),'utf8'));
+ await db.sql(`INSERT INTO "Utilisateur" (id,email,"motDePasseHash",role,"updatedAt") VALUES ('admin','admin@sql.invalid','hash','ADMIN',now());
+ INSERT INTO "Formation" (id,titre,"updatedAt") VALUES ('f','Ancienne formation',now());
+ INSERT INTO "Session" (id,"formationId","updatedAt") VALUES ('s','f',now());
+ INSERT INTO "Inscription" (id,"sessionId",prenom,nom,email,"typeDemande") VALUES ('i','s','A','B','a@sql.invalid','PARTICULIER');
+ INSERT INTO "DossierAdministratif" ("inscriptionId","parcoursDocumentaire","updatedAt") VALUES ('i',true,now());
+ INSERT INTO "ElementDocumentaire" ("inscriptionId",categorie,note) VALUES ('i','PROGRAMME','Note conservée');
+ INSERT INTO "PieceJointe" (id,"inscriptionId",categorie,version,"depotId","stockageKey","nomOriginal",taille,"typeMime",empreinte,"auteurId") VALUES ('p','i','PROGRAMME',1,'00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','ancien.pdf',8,'application/pdf',repeat('a',64),'admin');`);
+ const before=(await db.sql('SELECT * FROM "PieceJointe"')).rows[0];
+ const migration=readFileSync(path.join(directory,target,'migration.sql'),'utf8');await db.sql(migration);
+ const after=(await db.sql('SELECT * FROM "PieceJointe"')).rows[0];assert.equal(after.partageStagiaire,false);assert.equal(after.partageRevision,0);delete after.partageStagiaire;delete after.partageRevision;assert.deepEqual(after,before);
+ assert.equal((await db.sql('SELECT count(*)::int AS n FROM "RattachementStagiaire"')).rows[0].n,0);
+ await db.sql(readFileSync(path.join(directory,'20261109200000_questionnaires','migration.sql'),'utf8'));
+ await db.sql(readFileSync(path.join(directory,'20261109210000_presences_manuelles','migration.sql'),'utf8'));
+ const config=path.join(db.run,'stagiaires.config.ts');
+ writeFileSync(config,`import {defineConfig,env} from 'prisma/config';export default defineConfig({schema:${JSON.stringify(path.join(backend,'prisma/schema.prisma'))},datasource:{url:env('STAGIAIRE_TEST_URL')}});`);
+ db.command(process.execPath,[path.join(backend,'node_modules/prisma/build/index.js'),'migrate','diff','--from-config-datasource','--to-schema',path.join(backend,'prisma/schema.prisma'),'--exit-code','--config',config],{STAGIAIRE_TEST_URL:db.connectionString});
+ results.push('migration SQL sans divergence ; pièce existante conservée et privée, aucun rattachement initial');
+ const insert=(id,sha)=>db.sql('INSERT INTO "InvitationStagiaire" (id,"inscriptionId",email,empreinte,"expireAt","auteurId") VALUES ($1,\'i\',\'a@sql.invalid\',$2,now()+interval \'2 days\',\'admin\')',[id,sha]);
+ await insert('inv1','b'.repeat(64));await assert.rejects(()=>insert('inv2','c'.repeat(64)),e=>e.code==='23505');
+ await db.sql('UPDATE "InvitationStagiaire" SET "revoqueeAt"=now()');await insert('inv2','c'.repeat(64));
+ await assert.rejects(()=>db.sql('UPDATE "PieceJointe" SET "partageRevision"=-1'),e=>e.code==='23514');
+ await assert.rejects(()=>db.sql('DELETE FROM "Inscription" WHERE id=\'i\''),e=>e.code==='23001');
+ await db.sql(readFileSync(path.join(backend,'prisma/rollbacks/20261109210000_presences_manuelles.sql'),'utf8'));
+ await db.sql(readFileSync(path.join(backend,'prisma/rollbacks/20261109200000_questionnaires.sql'),'utf8'));
+ const down=readFileSync(path.join(backend,'prisma/rollbacks',target+'.sql'),'utf8');
+ await assert.rejects(()=>db.sql(down),e=>e.code==='P0001');await db.rollback();
+ await db.sql('DELETE FROM "InvitationStagiaire"');await db.sql(down);await db.sql(migration);
+ assert.equal((await db.sql('SELECT note FROM "ElementDocumentaire"')).rows[0].note,'Note conservée');
+ results.push('unicité invitation active, contraintes, relations RESTRICT, rollback protégé et réapplication isolée');
+ console.log('PASS '+results.join('\nPASS '));
+}catch(error){console.error('FAIL SQL stagiaires : '+(error.code||error.name));process.exitCode=1;}
+finally{if(db){await db.close();writeFileSync(path.join(db.run,'stagiaires-schema-results.json'),JSON.stringify({success:!process.exitCode,results},null,2));console.log('Résultats : '+db.run);}}

@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync,writeFileSync} from 'node:fs';
+import path from 'node:path';
+import {isolatedDb,backend} from './lib/isolated-db.mjs';
+const target='20261109210000_presences_manuelles';let db;const results=[];
+try{
+ db=await isolatedDb();await db.guard();const dir=path.join(backend,'prisma/migrations');
+ for(const name of readdirSync(dir).filter(n=>n!=='migration_lock.toml'&&n<target).sort())await db.sql(readFileSync(path.join(dir,name,'migration.sql'),'utf8'));
+ await db.sql(`INSERT INTO "Utilisateur" (id,email,"motDePasseHash",role,"updatedAt") VALUES ('a','admin@sql.invalid','hash','ADMIN',now());
+ INSERT INTO "Formation" (id,titre,"updatedAt") VALUES ('f','Formation conservée',now());
+ INSERT INTO "Session" (id,"formationId","updatedAt") VALUES ('s','f',now()),('other','f',now());
+ INSERT INTO "Seance" (id,"sessionId",debut,fin,"updatedAt") VALUES ('p','s','2025-01-10T08:00Z','2025-01-10T11:30Z',now()),('future','s','2099-01-10T08:00Z','2099-01-10T09:00Z',now()),('o','other','2025-01-10T08:00Z','2025-01-10T09:00Z',now());
+ INSERT INTO "Inscription" (id,"sessionId",prenom,nom,email,"typeDemande",statut) VALUES ('i','s','A','B','a@sql.invalid','PARTICULIER','CONFIRMEE'),('j','s','C','D','j@sql.invalid','PARTICULIER','EN_ATTENTE');`);
+ const before=(await db.sql('SELECT * FROM "Inscription" ORDER BY id')).rows;
+ const migration=readFileSync(path.join(dir,target,'migration.sql'),'utf8');await db.sql(migration);
+ assert.deepEqual((await db.sql('SELECT * FROM "Inscription" ORDER BY id')).rows,before);
+ const config=path.join(db.run,'presences.config.ts');writeFileSync(config,`import {defineConfig,env} from 'prisma/config';export default defineConfig({schema:${JSON.stringify(path.join(backend,'prisma/schema.prisma'))},datasource:{url:env('PRESENCE_TEST_URL')}});`);
+ db.command(process.execPath,[path.join(backend,'node_modules/prisma/build/index.js'),'migrate','diff','--from-config-datasource','--to-schema',path.join(backend,'prisma/schema.prisma'),'--exit-code','--config',config],{PRESENCE_TEST_URL:db.connectionString});
+ assert.equal((await db.sql('SELECT count(*)::int AS n FROM "Presence"')).rows[0].n,0);
+ const triggers=(await db.sql("SELECT count(*)::int AS n FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'cmh_presence%'")).rows[0].n;assert.equal(triggers,4);
+ results.push('migration SQL sans divergence, données conservées, zéro ligne créée et quatre triggers de cohérence/audit présents');
+ const insert=(inscription='i',seance='p',etat='PRESENT',ms=12600000)=>db.sql('INSERT INTO "Presence" ("inscriptionId","seanceId",etat,"dureeSuivieMs",debut,fin,"updatedAt","modifieParId") SELECT $1,id,$3,$4,debut,fin,now(),\'a\' FROM "Seance" WHERE id=$2',[inscription,seance,etat,ms]);
+ for(const args of[['i','o'],['i','future'],['j','p'],['i','p','PARTIEL',-1],['i','p','PARTIEL',12600001],['i','p','PARTIEL',1001],['i','p','PRESENT',null]])await assert.rejects(()=>insert(...args),e=>e.code==='23514');
+ await insert();
+ await assert.rejects(()=>insert(),e=>e.code==='23505');
+ await assert.rejects(()=>db.sql('UPDATE "Presence" SET etat=\'ABSENT\',"dureeSuivieMs"=0,revision=2'),e=>e.code==='23514');
+ await db.sql('UPDATE "Presence" SET etat=\'ABSENT\',"dureeSuivieMs"=0,revision=2,"motifCorrection"=\'Correction tracée\'');
+ const audit=(await db.sql('SELECT * FROM "ChangementPresence" ORDER BY date,id')).rows;assert.equal(audit.length,2);
+ const correction=audit.find(row=>row.ancienEtat==='PRESENT');assert.equal(correction.nouvelEtat,'ABSENT');assert.equal(correction.ancienneDureeMs,'12600000');assert.equal(correction.nouvelleDureeMs,'0');assert.equal(correction.auteurId,'a');
+ await assert.rejects(()=>db.sql('UPDATE "Seance" SET fin=fin+interval \'1 minute\' WHERE id=\'p\''),e=>e.code==='23514');
+ await assert.rejects(()=>db.sql('DELETE FROM "Seance" WHERE id=\'p\''),e=>e.code==='23001');
+ await assert.rejects(()=>db.sql('DELETE FROM "Inscription" WHERE id=\'i\''),e=>e.code==='23001');
+ await db.sql('UPDATE "Inscription" SET statut=\'ANNULEE\' WHERE id=\'i\'');
+ assert.equal((await db.sql('SELECT count(*)::int AS n FROM "Presence"')).rows[0].n,1);
+ await assert.rejects(()=>db.sql('UPDATE "Presence" SET etat=\'PRESENT\',"dureeSuivieMs"=12600000,revision=3,"motifCorrection"=\'Après annulation\''),e=>e.code==='23514');
+ await assert.rejects(()=>db.sql('UPDATE "Inscription" SET "sessionId"=\'other\' WHERE id=\'i\''),e=>e.code==='23514');
+ results.push('contrôles SQL directs : session, confirmation, futur, durées, unicité, motif/auteur/date, audit atomique, gel de séance et annulation conservée');
+ const down=readFileSync(path.join(backend,'prisma/rollbacks',target+'.sql'),'utf8');
+ await assert.rejects(()=>db.sql(down),e=>e.code==='P0001');await db.rollback();
+ await db.sql('DELETE FROM "ChangementPresence";DELETE FROM "Presence";UPDATE "Inscription" SET statut=\'CONFIRMEE\' WHERE id=\'i\';');
+ await db.sql(down);await db.sql(migration);assert.deepEqual((await db.sql('SELECT * FROM "Inscription" ORDER BY id')).rows,before);
+ results.push('rollback protégé puis retour arrière et réapplication sur base isolée remise en état, données initiales conservées');
+ console.log('PASS '+results.join('\nPASS '));
+}catch(error){console.error('FAIL SQL présences : '+(error.code||error.name));process.exitCode=1;}
+finally{if(db){await db.close();writeFileSync(path.join(db.run,'presences-schema-results.json'),JSON.stringify({success:!process.exitCode,results},null,2));console.log('Résultats : '+db.run);}}

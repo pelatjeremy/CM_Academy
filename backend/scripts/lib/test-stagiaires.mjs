@@ -1,0 +1,95 @@
+import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
+import {writeFileSync} from 'node:fs';
+import path from 'node:path';
+import {hashPassword} from '../../auth/passwords.js';
+export async function testStagiaires({prisma,client,pass,run,restart}){
+ const admin=client(),anon=client();assert.equal((await admin.login()).status,200);
+ const pwd=randomBytes(24).toString('base64url');
+ const formation=await prisma.formation.create({data:{titre:'Parcours stagiaire isolé',description:'Présentation réservée au dossier',parcoursDocumentaire:true}});
+ const session=await prisma.session.create({data:{formationId:formation.id,lieu:'Salle de test',seances:{create:[{debut:new Date('2027-01-15T09:00Z'),fin:new Date('2027-01-15T12:30Z')}]},accesPrive:{create:{lienVisioconference:'https://private.invalid/SECRET',consignes:'CONSIGNES_SECRETES'}}}});
+ async function inscription(email){return prisma.inscription.create({data:{sessionId:session.id,email,prenom:'Alice',nom:'Stagiaire isolée',typeDemande:'PARTICULIER',dossier:{create:{parcoursDocumentaire:true,elements:{create:{categorie:'PROGRAMME',note:'NOTE_INTERNE'}}}}}});}
+ const a=await inscription('alice@stagiaire-test.invalid'),b=await inscription('bob@stagiaire-test.invalid');
+ async function write(c,route,body={},method='POST'){await c.token();return c.request(route,{method,headers:{'Content-Type':'application/json','x-csrf-token':c.csrf},body:JSON.stringify(body)});}
+ const invRoute=id=>'/api/admin/inscriptions/'+id+'/espace-stagiaire';
+ async function invite(id){const res=await write(admin,invRoute(id)+'/invitation');assert.equal(res.status,201);return(await res.json()).fragment;}
+ const activate=(token,password=pwd,c=anon)=>write(c,'/api/auth/invitations/activer',{token,password});
+ assert.equal((await anon.request(invRoute(a.id))).status,401);
+ assert.equal((await anon.request('/api/auth/invitations/activer',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,403);
+ assert.equal((await admin.request(invRoute(a.id)+'/invitation',{method:'POST',body:'{}',headers:{'Content-Type':'application/json'}})).status,403);
+ const old=await invite(a.id),current=await invite(a.id);
+ assert.equal((await activate(old)).status,400);
+ assert.equal((await activate(current,'court')).status,422);
+ const race=await Promise.all([activate(current,pwd,client()),activate(current,pwd,client())]);assert.deepEqual(race.map(x=>x.status).sort(),[200,400]);
+ assert.equal((await activate(current)).status,400);
+ assert.equal(await prisma.rattachementStagiaire.count({where:{inscriptionId:a.id}}),1);
+ assert.equal(await prisma.utilisateur.count({where:{email:a.email}}),1);
+ const aliceUser=await prisma.utilisateur.findUnique({where:{email:a.email}});
+ assert.equal(aliceUser.role,'STAGIAIRE');
+ const audits=await(await admin.request(invRoute(a.id))).json();assert(!JSON.stringify(audits).includes(current)&&!JSON.stringify(audits).includes('empreinte'));assert(audits.invitations.some(x=>x.revoqueeAt)&&audits.invitations.some(x=>x.utiliseeAt));
+ pass('stagiaires : invitation ADMIN/CSRF, révocation, usage unique et activation concurrente sans doublon ; audit sans secret');
+ const expired=await invite(b.id);
+ await prisma.invitationStagiaire.updateMany({where:{inscriptionId:b.id},data:{createdAt:new Date(Date.now()-3*86400000),expireAt:new Date(Date.now()-86400000)}});
+ assert.equal((await activate(expired)).status,400);
+ const activeB=await invite(b.id);assert.equal((await activate(activeB)).status,200);
+ const alice=client(),bob=client();assert.equal((await alice.login(a.email,pwd)).status,200);assert.equal((await bob.login(b.email,pwd)).status,200);
+ assert.equal((await alice.request('/api/admin/moi')).status,403);
+ assert.equal((await alice.request(invRoute(b.id))).status,403);
+ const unattached=await prisma.inscription.create({data:{sessionId:(await prisma.session.create({data:{formationId:formation.id}})).id,email:a.email,prenom:'Autre',nom:'Sans rattachement',typeDemande:'PARTICULIER'}});
+ let list=await(await alice.request('/api/stagiaire/inscriptions')).json();assert.deepEqual(list.items.map(x=>x.id),[a.id]);
+ assert.equal((await alice.request('/api/stagiaire/inscriptions/'+unattached.id)).status,404);
+ assert.equal((await bob.request('/api/stagiaire/inscriptions/'+a.id)).status,404);
+ assert.equal((await anon.request('/api/stagiaire/inscriptions')).status,401);assert.equal((await admin.request('/api/stagiaire/inscriptions')).status,403);
+ const second=await invite(unattached.id);
+ assert.equal((await activate(second,'mauvais')).status,400);
+ assert.equal((await activate(second)).status,200);
+ assert.equal((await prisma.utilisateur.findUnique({where:{id:aliceUser.id}})).motDePasseHash,aliceUser.motDePasseHash);
+ assert.equal(await prisma.rattachementStagiaire.count({where:{utilisateurId:aliceUser.id}}),2);
+ pass('stagiaires : expiration, compte existant sans écrasement, propriété et absence de rattachement par email ; rôles strictement séparés');
+ const root='/api/admin/inscriptions/'+a.id+'/dossier/elements/PROGRAMME/fichiers';
+ const pdf=Buffer.from('%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n');
+ async function upload(revision){await admin.token();const data=new FormData();data.append('fichier',new Blob([pdf],{type:'application/pdf'}),'programme-stagiaire.pdf');const r=await admin.request(root,{method:'POST',body:data,headers:{'x-csrf-token':admin.csrf,'x-depot-id':crypto.randomUUID(),'x-fichier-revision':String(revision)}});assert.equal(r.status,201);return(await r.json()).file;}
+ const first=await upload(0);assert.equal(first.partageStagiaire,false);
+ const download='/api/stagiaire/inscriptions/'+a.id+'/fichiers/'+first.id+'/telecharger';
+ assert.equal((await alice.request(download)).status,404);
+ const share=root+'/'+first.id+'/partage';
+ assert.equal((await admin.request(share,{method:'PUT',headers:{'Content-Type':'application/json'},body:'{}'})).status,403);
+ assert.equal((await write(alice,share,{partage:true,revision:0},'PUT')).status,403);
+ assert.equal((await write(admin,share,{partage:true,revision:0,extra:true},'PUT')).status,422);
+ assert.equal((await write(admin,share,{partage:true,revision:0},'PUT')).status,200);
+ const file=await alice.request(download);assert.equal(file.status,200);assert(file.headers.get('content-disposition').startsWith('attachment;'));assert.equal(file.headers.get('x-content-type-options'),'nosniff');assert.deepEqual(Buffer.from(await file.arrayBuffer()),pdf);
+ assert.equal((await bob.request(download)).status,404);
+ const secondFile=await upload(1);assert.equal(secondFile.partageStagiaire,false);
+ const detail=await(await alice.request('/api/stagiaire/inscriptions/'+a.id)).json();
+ assert.equal(detail.fichiers.length,1);assert.equal(detail.fichiers[0].id,first.id);
+ for(const secret of['NOTE_INTERNE','CONSIGNES_SECRETES','private.invalid','stockageKey','empreinte','historique','auteur'])assert(!JSON.stringify(detail).includes(secret));
+ assert.equal(detail.item.session.seances[0].debut,'2027-01-15T09:00:00.000Z');
+ const conflicts=await Promise.all([write(admin,share,{partage:false,revision:1},'PUT'),write(admin,share,{partage:false,revision:1},'PUT')]);assert.deepEqual(conflicts.map(x=>x.status).sort(),[200,409]);
+ assert.equal((await alice.request(download)).status,404);
+ assert.equal((await(await alice.request('/api/stagiaire/inscriptions/'+a.id)).json()).fichiers.length,0);
+ assert.equal(await prisma.partagePieceJointe.count({where:{fichierId:first.id}}),2);
+ pass('stagiaires : documents privés par défaut, partage par version, retrait immédiat, concurrence, confidentialité et téléchargement isolé par propriétaire');
+ const adminEmail=(await prisma.utilisateur.findFirst({where:{role:'ADMIN'}})).email;
+ const collision=await inscription(adminEmail);assert.equal((await write(admin,invRoute(collision.id)+'/invitation')).status,409);
+ // Deux inscriptions pour le même nouveau compte : une seule création, mot de passe jamais écrasé.
+ const c1=await inscription('concurrent@stagiaire-test.invalid');
+ const c2=await prisma.inscription.create({data:{sessionId:unattached.sessionId,email:c1.email,prenom:'C',nom:'Test',typeDemande:'PARTICULIER'}});
+ const t1=await invite(c1.id),t2=await invite(c2.id);
+ await restart({});
+ const results=await Promise.all([activate(t1,pwd,client()),activate(t2,pwd,client())]);
+ assert(results.some(r=>r.status===200));assert(results.every(r=>[200,400].includes(r.status)));
+ assert.equal(await prisma.utilisateur.count({where:{email:c1.email}}),1);
+ pass('stagiaires : comptes ADMIN protégés et activations de deux invitations du même email sans doublon');
+ await restart({});
+ const rate=client();for(let n=0;n<20;n++)assert.equal((await write(rate,'/api/auth/invitations/consulter',{token:'x'.repeat(43)})).status,400);
+ assert.equal((await write(rate,'/api/auth/invitations/consulter',{token:'x'.repeat(43)})).status,429);
+ await restart({});
+ // Compte existant dédié au parcours navigateur ; activation encore à faire depuis l'administration.
+ const browserEmail='navigateur@stagiaire-test.invalid';
+ await prisma.utilisateur.create({data:{email:browserEmail,motDePasseHash:await hashPassword(pwd),role:'STAGIAIRE'}});
+ const browserInscription=await inscription(browserEmail);
+ const nouveauEmail='nouveau-navigateur@stagiaire-test.invalid';
+ const nouveauInscription=await inscription(nouveauEmail);
+ writeFileSync(path.join(run,'stagiaire-browser.json'),JSON.stringify({nouveauEmail,nouveauInscriptionId:nouveauInscription.id,email:browserEmail,password:pwd,inscriptionId:browserInscription.id,aliceEmail:a.email,alicePassword:pwd,aliceInscriptionId:a.id,fileId:first.id}),{mode:0o600});
+ pass('stagiaires : limitation des activations et données navigateur exclusivement isolées');
+}

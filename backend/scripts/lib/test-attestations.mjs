@@ -1,0 +1,104 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {readdir,writeFile,unlink} from 'node:fs/promises';
+import path from 'node:path';
+import {createDocumentStorage} from '../../lib/documents.js';
+export async function testAttestations({prisma,client,pass,run,restart,fixture}){
+ const creds=JSON.parse(readFileSync(path.join(run,'stagiaire-browser.json'),'utf8'));
+ const admin=client(),alice=client(),bob=client(),anon=client(),member=client();
+ await admin.login();await alice.login(creds.aliceEmail,creds.alicePassword);await bob.login('bob@stagiaire-test.invalid',creds.alicePassword);await member.login('member@auth-test.invalid');
+ async function write(c,url,body,method='POST'){await c.token();return c.request(url,{method,headers:{'Content-Type':'application/json','x-csrf-token':c.csrf},body:JSON.stringify(body)});}
+ const org='/api/admin/organisme-attestation';
+ const formation=await prisma.formation.create({data:{titre:'Accompagner le cheval : équilibre et bien-être',objectifs:'Identifier les besoins du cheval.\nDécrire les étapes de préparation, sans déclarer d’acquis.',format:'PRESENTIEL',parcoursDocumentaire:false}});
+ const session=await prisma.session.create({data:{formationId:formation.id,lieu:'Lieu fictif isolé',accesPrive:{create:{lienVisioconference:'https://private.invalid/SECRET_ATTESTATION',consignes:'NE_PAS_EXPORTER'}},seances:{create:Array.from({length:4},(_,i)=>({debut:new Date(`2025-06-${10+i}T07:00Z`),fin:new Date(`2025-06-${10+i}T10:30Z`)}))}}});
+ const seances=await prisma.seance.findMany({where:{sessionId:session.id},orderBy:{debut:'asc'}});
+ async function insc(email){return prisma.inscription.create({data:{sessionId:session.id,email,prenom:'Éléonore',nom:'D’Œuvre',statut:'CONFIRMEE',typeDemande:'PARTICULIER',dossier:{create:{parcoursDocumentaire:false}}}});}
+ const a=await insc(creds.aliceEmail),b=await insc('bob@stagiaire-test.invalid');
+ for(const i of [a,b]){const inv=await write(admin,'/api/admin/inscriptions/'+i.id+'/espace-stagiaire/invitation',{});assert.equal(inv.status,201);assert.equal((await write(anon,'/api/auth/invitations/activer',{token:(await inv.json()).fragment,password:creds.alicePassword})).status,200);}
+ const root=id=>'/api/admin/inscriptions/'+id+'/dossier/attestations',url=root(a.id);
+ async function preview(id=a.id){const r=await write(admin,root(id)+'/apercu',{});assert.equal(r.status,200);return r.json();}
+ const emit=(p,extra={})=>({requeteId:randomUUID(),empreinte:p.empreinte,couranteId:p.couranteId,motif:'',confirmation:true,...extra});
+ const count=await prisma.attestationEmission.count();
+ assert.equal((await anon.request(url)).status,401);assert.equal((await alice.request(url)).status,403);assert.equal((await member.request(org)).status,403);
+ assert.equal((await anon.request(org)).status,401);assert.equal((await admin.request(org)).status,200);
+ assert.equal((await admin.request(url)).status,200);assert.equal(await prisma.attestationEmission.count(),count);assert.equal(await prisma.organismeAttestation.count(),0);
+ assert.equal((await admin.request(url+'/apercu',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,403);
+ let p=await preview();assert(p.fields['organisme.denomination']&&p.fields.presences&&p.fields.duree);
+ assert.equal(await prisma.attestationEmission.count(),count);assert.equal(await prisma.pieceJointe.count({where:{inscriptionId:a.id}}),0);assert.equal(await prisma.elementDocumentaire.count({where:{inscriptionId:a.id}}),0);
+ assert(Buffer.from(p.pdf,'base64').subarray(0,5).equals(Buffer.from('%PDF-')));
+ assert.equal((await write(admin,url+'/emettre',emit(p))).status,422);
+ let orgData={revision:0,denomination:'Organisme fictif — tests isolés',adresse:'Adresse fictive de test\nVille de test',identifiant:'TEST-ISOLÉ',representant:''};
+ assert.equal((await admin.request(org,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(orgData)})).status,403);
+ assert.equal((await write(alice,org,orgData,'PUT')).status,403);
+ assert.equal((await write(admin,org,{...orgData,signature:'NON'},'PUT')).status,422);
+ assert.equal((await write(admin,org,{...orgData,denomination:'x'.repeat(201)},'PUT')).status,422);
+ assert.equal((await write(admin,org,orgData,'PUT')).status,200);assert.equal((await write(admin,org,orgData,'PUT')).status,409);
+ p=await preview();orgData={...orgData,revision:1,identifiant:'TEST-ISOLÉ-V2'};assert.equal((await write(admin,org,orgData,'PUT')).status,200);assert.equal((await write(admin,url+'/emettre',emit(p))).status,409);
+ async function presence(i,s,etat='PRESENT',revision=null,motif=''){return write(admin,`/api/admin/inscriptions/${i.id}/seances/${s.id}/presence`,{etat,revision,minutesPartielles:etat==='PARTIEL'?90:null,debutAttendu:s.debut.toISOString(),finAttendue:s.fin.toISOString(),motif},'PUT');}
+ for(const s of seances)assert.equal((await presence(a,s,'ABSENT')).status,200);
+ p=await preview();assert(!p.fields.presences&&p.fields.duree);assert.equal((await write(admin,url+'/emettre',emit(p))).status,422);
+ assert.equal((await presence(a,seances[0],'PRESENT',1,'Présence complète corrigée')).status,200);
+ assert.equal((await presence(a,seances[1],'PARTIEL',1,'Participation partielle corrigée')).status,200);
+ const futureSession=await prisma.session.create({data:{formationId:formation.id,seances:{create:{debut:new Date('2099-01-01T08:00Z'),fin:new Date('2099-01-01T09:00Z')}}}});
+ const future=await prisma.inscription.create({data:{sessionId:futureSession.id,email:'future@attestation.invalid',prenom:'Test',nom:'Futur',typeDemande:'PARTICULIER',dossier:{create:{parcoursDocumentaire:false}}}});
+ const fp=await preview(future.id);assert(fp.fields.fin);assert.equal((await write(admin,root(future.id)+'/emettre',emit(fp))).status,422);
+ pass('attestations : aperçu PDF sans écriture, organisme ADMIN/CSRF/validation/conflit, session future, inconnues et durée zéro bloquées');
+ p=await preview();assert.deepEqual(p.fields,{});const initial=emit(p);
+ writeFileSync(path.join(run,'attestation-brouillon.pdf'),Buffer.from(p.pdf,'base64'));
+ assert.equal((await write(admin,url+'/emettre',{...initial,confirmation:false})).status,422);
+ assert.equal((await write(admin,url+'/emettre',{...initial,foo:1})).status,422);
+ assert.equal((await write(alice,url+'/emettre',initial)).status,403);
+ assert.equal((await admin.request(url+'/emettre',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(initial)})).status,403);
+ const emitted=await write(admin,url+'/emettre',initial);assert.equal(emitted.status,201);let first=(await emitted.json()).item;
+ assert(first.courante);assert.equal(first.numero,1);assert.equal(first.pieceJointe.partageStagiaire,false);
+ const stored=await prisma.attestationEmission.findUnique({where:{id:first.id}});assert.equal(stored.donnees.dureeProgrammeeMs,840*60000);assert.equal(stored.donnees.dureeSuivieMs,300*60000);
+ assert(!JSON.stringify(stored.donnees).includes('SECRET_ATTESTATION'));assert(!JSON.stringify(stored.donnees).includes('NE_PAS_EXPORTER'));
+ const element=await prisma.elementDocumentaire.findUnique({where:{inscriptionId_categorie:{inscriptionId:a.id,categorie:'ATTESTATION'}}});assert.equal(element.etat,'A_PREPARER');assert.equal((await prisma.dossierAdministratif.findUnique({where:{inscriptionId:a.id}})).parcoursDocumentaire,false);
+ const download=()=>admin.request(url+'/'+first.id+'/telecharger');const pdf=await download();assert.equal(pdf.status,200);assert.equal(pdf.headers.get('content-type'),'application/pdf');assert(pdf.headers.get('content-disposition').startsWith('attachment;'));assert.equal(pdf.headers.get('x-content-type-options'),'nosniff');const buffer=Buffer.from(await pdf.arrayBuffer());writeFileSync(path.join(run,'attestation-partielle.pdf'),buffer);
+ assert.equal((await anon.request(url+'/'+first.id+'/telecharger')).status,401);assert.equal((await alice.request(url+'/'+first.id+'/telecharger')).status,403);assert.equal((await admin.request(root(b.id)+'/'+first.id+'/telecharger')).status,404);
+ const studentDownload='/api/stagiaire/inscriptions/'+a.id+'/fichiers/'+first.pieceJointe.id+'/telecharger';
+ assert.equal((await alice.request(studentDownload)).status,404);
+ const partage=`/api/admin/inscriptions/${a.id}/dossier/elements/ATTESTATION/fichiers/${first.pieceJointe.id}/partage`;
+ assert.equal((await write(admin,partage,{partage:true,revision:0},'PUT')).status,200);assert.equal((await alice.request(studentDownload)).status,200);assert.equal((await bob.request(studentDownload)).status,404);
+ assert.equal((await write(admin,partage,{partage:false,revision:1},'PUT')).status,200);assert.equal((await alice.request(studentDownload)).status,404);
+ assert.equal((await write(admin,url+'/emettre',initial)).status,200);
+ assert.equal((await write(admin,url+'/emettre',{...initial,motif:'Rejeu altéré'})).status,409);
+ assert.equal(await prisma.attestationEmission.count({where:{inscriptionId:a.id}}),1);
+ pass('attestations : émission partielle exacte, PDF privé rattaché sans effet documentaire, rejeu unique, téléchargement ADMIN/propriété et partage/retrait existants');
+ p=await preview();await prisma.formation.update({where:{id:formation.id},data:{objectifs:'Objectifs modifiés après émission'}});
+ assert.equal((await write(admin,url+'/emettre',emit(p,{motif:'Correction'}))).status,409);
+ p=await preview();assert.equal((await presence(a,seances[0],'PARTIEL',2,'Correction de durée')).status,200);assert.equal((await write(admin,url+'/emettre',emit(p,{motif:'Correction'}))).status,409);
+ assert.deepEqual((await prisma.attestationEmission.findUnique({where:{id:first.id}})).donnees,stored.donnees);assert.deepEqual(Buffer.from(await(await download()).arrayBuffer()),buffer);
+ assert.equal((await write(admin,url+'/emettre',initial)).status,200);
+ p=await preview();assert.equal((await write(admin,url+'/emettre',emit(p))).status,422);
+ const raced=await Promise.all([write(admin,url+'/emettre',emit(p,{motif:'Correction vérifiée A'})),write(admin,url+'/emettre',emit(p,{motif:'Correction vérifiée B'}))]);assert.deepEqual(raced.map(r=>r.status).sort(),[201,409]);
+ const versions=(await(await admin.request(url)).json()).versions;assert.equal(versions.length,2);assert.equal(versions.filter(v=>v.courante).length,1);assert.equal(versions[0].numero,2);assert(!versions[0].pieceJointe.partageStagiaire);
+ assert.equal((await prisma.attestationEmission.findUnique({where:{id:first.id}})).courante,false);
+ await assert.rejects(()=>prisma.attestationEmission.update({where:{id:first.id},data:{motif:'Écrasement interdit'}}));
+ await assert.rejects(()=>prisma.attestationEmission.delete({where:{id:first.id}}));
+ pass('attestations : sources revérifiées, PDF et données figés, correction motivée, historique/ancienne version et concurrence sans double émission');
+ for(const s of seances)assert.equal((await presence(b,s)).status,200);
+ const bp=await preview(b.id),bdata=emit(bp),braces=await Promise.all([write(admin,root(b.id)+'/emettre',bdata),write(admin,root(b.id)+'/emettre',bdata)]);
+ assert(braces.some(r=>r.status===201));assert(braces.every(r=>[200,201,409].includes(r.status)));assert.equal(await prisma.attestationEmission.count({where:{inscriptionId:b.id}}),1);assert.equal((await write(admin,root(b.id)+'/emettre',bdata)).status,200);
+ const full=await prisma.attestationEmission.findFirst({where:{inscriptionId:b.id}});assert.equal(full.donnees.dureeSuivieMs,full.donnees.dureeProgrammeeMs);
+ pass('attestations : participation complète et double clic/rejeu simultané avec une seule émission');
+ const storage=createDocumentStorage({root:path.join(run,'documents')});const auditBefore=await storage.audit(prisma,{ageMs:0});assert.equal(auditBefore.manquants.length,0);assert.equal(auditBefore.orphelins.length,0);
+ p=await preview();const broken=path.join(run,'stockage-attestation-indisponible');await writeFile(broken,'panne isolée');await restart({documentStorage:{root:broken}});await admin.login();
+ const beforeFailure=await prisma.attestationEmission.count();assert.equal((await write(admin,url+'/emettre',emit(p,{motif:'Essai panne'}))).status,503);assert.equal(await prisma.attestationEmission.count(),beforeFailure);
+ await restart({attestationPdf:async()=>{throw new Error('FAIL_GENERATE');}});await admin.login();assert.equal((await write(admin,url+'/emettre',emit(p,{motif:'Essai panne génération'}))).status,503);assert.equal(await prisma.attestationEmission.count(),beforeFailure);
+ await restart({documentStorage:{root:path.join(run,'documents')}});await admin.login();await alice.login(creds.aliceEmail,creds.alicePassword);await unlink(broken);
+ // Échec simulé après promotion et avant commit : la transaction doit tout annuler.
+ const objsBefore=(await readdir(path.join(run,'documents','objets'))).length;
+ const originalTransaction=prisma.$transaction.bind(prisma);let fail=true;
+ prisma.$transaction=async(action,options)=>originalTransaction(async tx=>{const result=await action(tx);if(fail&&result?.item?.reference){fail=false;throw new Error('FAIL_AFTER_PROMOTE');}return result;},options);
+ assert.equal((await write(admin,url+'/emettre',emit(p,{motif:'Panne après promotion'}))).status,503);prisma.$transaction=originalTransaction;
+ assert.equal((await readdir(path.join(run,'documents','objets'))).length,objsBefore);assert.equal(await prisma.attestationEmission.count(),beforeFailure);
+ const publicData=await(await anon.request('/api/catalogue/formations')).text();for(const secret of ['AttestationEmission','dureeSuivieMs','Éléonore','TEST-ISOLÉ','empreinteRequete'])assert(!publicData.includes(secret));
+ await assert.rejects(()=>fixture.sql(readFileSync(path.join('prisma','rollbacks','20261111120000_attestations.sql'),'utf8')));await fixture.rollback();
+ pass('attestations : panne stockage et rollback après promotion sans émission/fichier incomplet, audit propre, confidentialité publique et rollback protégé');
+ // Un texte volontairement long contrôle pagination, accents et retours à la ligne.
+ await prisma.formation.update({where:{id:formation.id},data:{objectifs:Array.from({length:90},(_,i)=>`${i+1}. Préparer une démarche adaptée au cheval, à l’équilibre et au bien-être. Objectif pédagogique décrit sans résultat ni acquis présumé.`).join('\n')}});
+ p=await preview();await writeFile(path.join(run,'attestation-longue.pdf'),Buffer.from(p.pdf,'base64'));
+ writeFileSync(path.join(run,'attestations-browser.json'),JSON.stringify({inscriptionId:a.id,formationId:formation.id,sessionId:session.id}),{mode:0o600});
+}
