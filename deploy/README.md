@@ -63,7 +63,9 @@ Variables principales :
 - `DOCUMENT_STORAGE_DIR=/data/private`, `VIDEO_FFPROBE_PATH=/usr/bin/ffprobe`,
   `DEMO_FFMPEG_PATH=/usr/bin/ffmpeg`.
 - `DEMO_ADMIN_PASSWORD`, `DEMO_STUDENT_PASSWORD`, `DEMO_OTHER_PASSWORD` uniquement
-  pour l'initialisation explicite ; à retirer du service ensuite.
+  pour l'initialisation explicite ; leurs valeurs ont été vidées du service
+  après création des comptes. Les mots de passe des comptes restent conservés
+  uniquement dans le fichier privé local pour les accès de présentation.
 
 Le frontend et l'API partagent la même origine : aucun CORS permissif n'est
 nécessaire. Cookies `__Host-`, Secure, HttpOnly et SameSite=Lax ; CSRF et origine
@@ -104,6 +106,11 @@ questionnaire de positionnement et progression partielle. Les séances de la
 première session sont passées et totalisent 12 h de présence renseignée sur 14 h.
 La seconde session illustre les dates à venir. Les dates sont choisies à la
 première initialisation, puis conservées telles quelles.
+
+PostgreSQL utilise la commande `docker-entrypoint.sh postgres -c shared_buffers=32MB -c max_connections=40`.
+L'appel explicite à l'entrypoint officiel initialise le volume puis abandonne
+les privilèges root avant de lancer PostgreSQL. La commande applicative ordinaire
+est désormais `node server.js` : migrations et seed ne sont pas relancés.
 
 ## Présentation et dates
 
@@ -173,6 +180,37 @@ un rapport de sauvegarde/restauration correspondant existe. Les tests isolés
 vérifient la conservation des fichiers après redémarrage applicatif.
 
 ## Tests et limites
+
+Vérification sur l'URL HTTPS réelle le 11 novembre 2026 :
+
+- Catalogue et fiche publiés, bandeau, titres d'onglets et navigation active.
+- Connexions ADMIN/STAGIAIRE, cookie Secure/HttpOnly/SameSite, gestion pédagogique.
+- Heures de Paris, 14 h pédagogiques/programmées et 12 h de présence distinguées.
+- Lecture réelle de la vidéo synthétique, déplacement à 8 secondes, commandes
+  clavier, transcription et largeur mobile de 390 px sans débordement.
+- PDF protégé, vidéo GET/HEAD/Range 206, plage hors limites 416 ; refus anonyme
+  et autre stagiaire, absence de données privées dans la fiche publique.
+- Progression déclarée explicitement ; lecture seule sans modification.
+- Redémarrage effectif de l'application, sessions et progression conservées,
+  fichiers PDF/vidéo identiques par SHA-256, déconnexions des deux rôles et
+  accès révoqués. Quatorze migrations et empreintes conformes, trois comptes,
+  deux inscriptions, trois leçons, une version vidéo, trois fichiers référencés,
+  ffprobe 7.1 disponible et audit sans anomalie.
+
+Rapports locaux confidentiels : `.demo-environment/deployed-results.json` et
+`.demo-environment/deployed-after-restart-results.json` (hors Git).
+La vérification READ ONLY de la base locale a confirmé les empreintes inchangées
+des huit lignes métier relevées après l'étape vidéo, et quatorze migrations.
+
+Régressions isolées réellement exécutées : `test:videos:browser` (78 groupes),
+`test:attestations` (59 groupes), `test:demo`, `test:format`, lint et build.
+La commande de référence pour la recette vidéo navigateur reste
+`npm run test:videos:browser`.
+
+Incidents de préparation corrigés : commande PostgreSQL initiale inadaptée et
+démarrage applicatif avant disponibilité de la base. Les essais navigateur
+lancés pendant la stabilisation ont été relancés avec succès. Les deux services
+finaux sont en ligne ; un ancien déploiement échoué reste visible dans l'historique.
 
 Avant publication : lint, build, tests de format (hiver/été et heure ambiguë),
 suite complète `test:videos:browser`, test isolé `test:demo`, contrôles des secrets
