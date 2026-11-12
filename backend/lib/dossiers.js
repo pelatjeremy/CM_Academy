@@ -14,7 +14,7 @@ export async function initialiserDossier(tx, inscriptionId) {
 
   const inscription = await tx.inscription.findUnique({
     where: { id: inscriptionId },
-    select: { session: { select: { formation: { select: { parcoursDocumentaire: true } } } } },
+    select: { session: { select: { formation: { select: { parcoursDocumentaire: true, reglesDocumentaires: true } } } } },
   });
   if (!inscription) return false;
   const parcoursDocumentaire = inscription.session.formation.parcoursDocumentaire;
@@ -24,7 +24,7 @@ export async function initialiserDossier(tx, inscriptionId) {
   });
   if (created && parcoursDocumentaire) {
     await tx.elementDocumentaire.createMany({
-      data: categoriesDocumentaires.map(categorie => ({ inscriptionId, categorie })),
+      data: categoriesDocumentaires.map(categorie => ({ inscriptionId, categorie, ...(inscription.session.formation.reglesDocumentaires.find(r => r.categorie === categorie) || {}) })),
       skipDuplicates: true,
     });
   }

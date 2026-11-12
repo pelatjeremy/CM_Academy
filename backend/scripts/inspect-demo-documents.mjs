@@ -1,0 +1,2 @@
+import {remote,remoteSnapshot,databaseShell} from './lib/railway-maintenance.mjs';
+const s=remote(remoteSnapshot);console.log(JSON.stringify({database:s.database,migrations:s.migrations.length,complete:s.migrations.every(m=>m.finished_at&&!m.rolled_back_at),counts:Object.fromEntries(Object.entries(s.rows).map(([k,v])=>[k,v.count])),storageFiles:s.files.length,storageBytes:s.files.reduce((n,f)=>n+f.size,0)}));console.log(databaseShell('set -eu\npg_dump --version\n'));

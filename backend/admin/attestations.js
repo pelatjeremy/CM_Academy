@@ -30,7 +30,7 @@ export function adminAttestations(prisma,storage,generate=genererAttestation,clo
   res.set('Cache-Control','no-store').json({pdf:pdf.toString('base64'),empreinte:p.empreinte,couranteId:p.couranteId,fields:p.fields});
  }));
  router.get(base+'/:emissionId/telecharger',route(async(req,res)=>{
-  const row=await prisma.attestationEmission.findFirst({where:{id:req.params.emissionId,inscriptionId:req.params.id},select:{pieceJointe:{select:{stockageKey:true,taille:true,typeMime:true,nomOriginal:true}}}});
+  const row=await prisma.attestationEmission.findFirst({where:{id:req.params.emissionId,inscriptionId:req.params.id},select:{pieceJointe:{select:{stockageKey:true,stockageClassement:true,taille:true,typeMime:true,nomOriginal:true}}}});
   if(!row)throw erreur(404,'Attestation introuvable.');
   return telechargerDocument(storage,row.pieceJointe,res);
  }));

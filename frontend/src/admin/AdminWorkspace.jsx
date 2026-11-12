@@ -1,3 +1,4 @@
+import SuiviDocuments from './SuiviDocuments';
 import SessionPresences from './SessionPresences';
 import ContenuPedagogique from './ContenuPedagogique';
 import OrganismeAttestation from './OrganismeAttestation';
@@ -25,6 +26,7 @@ export default function AdminWorkspace({ user, onLogout, busy, error }) {
   const editing = kind && (parts[3] === 'nouveau' || (parts[3] && parts[4] === 'modifier'));
   const id = editing && parts[3] !== 'nouveau' ? decodeURIComponent(parts[3]) : undefined;
   const questionnaires = parts[1] === 'questionnaires' && parts.length <= 3;
+  const documents=parts[1]==='suivi-documents' && parts.length<=3;
   const dashboard = parts.length === 1;
   const organisme = parts[1] === 'organisme' && parts.length === 2;
   const dossier = parts[1] === 'inscriptions' && parts.length === 4 && parts[3] === 'dossier';
@@ -35,7 +37,7 @@ export default function AdminWorkspace({ user, onLogout, busy, error }) {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
-  useEffect(() => { document.title = `${presences ? 'Présences de la session' : contenuPedagogique ? 'Contenu pédagogique' : organisme ? 'Organisme' : questionnaires ? 'Questionnaires' : dossier ? 'Dossier administratif' : inscriptions ? 'Inscriptions' : kind ? resources[kind].title : 'Tableau de bord'} — Administration CMH Academy`; }, [kind, inscriptions, dossier, questionnaires, organisme, contenuPedagogique, presences]);
+  useEffect(() => { document.title = `${documents ? 'Suivi des documents' : presences ? 'Présences de la session' : contenuPedagogique ? 'Contenu pédagogique' : organisme ? 'Organisme' : questionnaires ? 'Questionnaires' : dossier ? 'Dossier administratif' : inscriptions ? 'Inscriptions' : kind ? resources[kind].title : 'Tableau de bord'} — Administration CMH Academy`; }, [kind, inscriptions, dossier, questionnaires, organisme, contenuPedagogique, presences, documents]);
   async function logout() {
     if (dirty) { setExit({ logout: true }); return; }
     allowExit.current = true;
@@ -57,14 +59,14 @@ export default function AdminWorkspace({ user, onLogout, busy, error }) {
     {exit && <ExitDialog onStay={() => setExit(null)} onLeave={leave} />}
     <a className="skip-link" href="#admin-content">Aller au contenu</a>
     <aside className="admin-sidebar"><a className="admin-brand" href="/admin">CMH <span>Academy</span></a><p className="admin-context">Administration</p>
-      <nav aria-label="Administration"><a href="/admin" aria-current={dashboard ? 'page' : undefined}>Tableau de bord</a><a href="/admin/inscriptions" aria-current={inscriptions ? 'page' : undefined}>Inscriptions</a><a href="/admin/questionnaires" aria-current={questionnaires ? 'page' : undefined}>Questionnaires</a><p className="admin-nav-heading">Catalogue</p>
+      <nav aria-label="Administration"><a href="/admin/suivi-documents" aria-current={documents?"page":undefined}>Suivi des documents</a><a href="/admin" aria-current={dashboard ? 'page' : undefined}>Tableau de bord</a><a href="/admin/inscriptions" aria-current={inscriptions ? 'page' : undefined}>Inscriptions</a><a href="/admin/questionnaires" aria-current={questionnaires ? 'page' : undefined}>Questionnaires</a><p className="admin-nav-heading">Catalogue</p>
         {Object.entries(resources).map(([key, config]) => <a key={key} href={`/admin/catalogue/${key}`} aria-current={kind === key ? 'page' : undefined}>{config.title}</a>)}
         <a href="/admin/organisme" aria-current={organisme ? 'page' : undefined}>Organisme</a>
       </nav><div className="admin-account"><p>{user.email}</p><button className="admin-button secondary" onClick={logout} disabled={busy}>{busy ? 'Déconnexion…' : 'Se déconnecter'}</button><a href="/">Voir le catalogue public</a></div>
     </aside>
     <main className="admin-content" id="admin-content">{error && <p className="admin-notice error" role="alert">{error}</p>}
       {dirty && <p className="admin-notice" role="status">Modifications non enregistrées</p>}
-      {organisme ? <OrganismeAttestation setDirty={setDirty} /> : questionnaires ? <QuestionnaireModeles id={parts[2]} setDirty={setDirty} /> : inscriptions ? (dossier ? <DossierAdministratif id={parts[2]} setDirty={setDirty} /> : <Inscriptions id={parts[2]} />) :
+      {documents ? <SuiviDocuments id={parts[2]} setDirty={setDirty}/> : organisme ? <OrganismeAttestation setDirty={setDirty} /> : questionnaires ? <QuestionnaireModeles id={parts[2]} setDirty={setDirty} /> : inscriptions ? (dossier ? <DossierAdministratif id={parts[2]} setDirty={setDirty} /> : <Inscriptions id={parts[2]} />) :
       kind ? (contenuPedagogique ? <ContenuPedagogique id={parts[3]} setDirty={setDirty} /> : presences ? <SessionPresences id={parts[3]} setDirty={setDirty} /> : editing ? (kind === 'formations' ? <FormationEditor id={id} setDirty={setDirty} /> : kind === 'sessions' ? <SessionEditor id={id} setDirty={setDirty} /> : <ResourceEditor kind={kind} id={id} setDirty={setDirty} />) : kind === 'sessions' ? <SessionList /> : <ResourceList kind={kind} />) : dashboard ? <>
         <div className="admin-page-heading"><div><p className="eyebrow">Votre espace</p><h1>Tableau de bord</h1><p>Gérez les formations, leurs sessions, les pôles et les fiches formateurs du catalogue.</p></div></div>
         <div className="admin-dashboard">{Object.entries(resources).map(([key, config]) => <section className="admin-panel" key={key}><h2>{config.title}</h2><p>{config.description}</p><a className="admin-button secondary" href={`/admin/catalogue/${key}`}>Gérer les {config.title.toLowerCase()}</a></section>)}</div>

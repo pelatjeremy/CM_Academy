@@ -9,6 +9,8 @@ async function request(path, options = {}) {
 export default function Admin({ connexion, stagiaire = false }) {
   const role = stagiaire ? 'STAGIAIRE' : 'ADMIN';
   const home = stagiaire ? '/stagiaire' : '/admin';
+  const requested=new URLSearchParams(window.location.search).get('retour');
+  const destination=requested && requested.startsWith(home+'/') && !requested.includes('\\') && !requested.startsWith(home+'/connexion') ? requested : home;
   const [state, setState] = useState('chargement');
   const [user, setUser] = useState(null);
   const [error, setError] = useState('');
@@ -24,21 +26,21 @@ export default function Admin({ connexion, stagiaire = false }) {
         const response = await request(connexion || stagiaire ? '/api/auth/moi' : '/api/admin/moi');
         if (!actif) return;
         if (response.status === 401) {
-          if (!connexion) { window.location.replace(home + '/connexion'); return; }
+          if (!connexion) { window.location.replace(home + '/connexion?retour='+encodeURIComponent(window.location.pathname)); return; }
           setState('pret'); return;
         }
         if (response.status === 403) { setState('interdit'); return; }
         if (!response.ok) throw new Error();
         const data = await response.json();
         if (!actif) return;
-        if (connexion && data.user.role === role) { window.location.replace(home); return; }
+        if (connexion && data.user.role === role) { window.location.replace(destination); return; }
         if (!connexion && data.user.role !== role) { setState('interdit'); return; }
         setUser(data.user); setState('pret');
       } catch { if (actif) setState('erreur'); }
     }
     verifier();
     return () => { actif = false; document.title = previousTitle; };
-  }, [connexion, stagiaire, role, home]);
+  }, [connexion, stagiaire, role, home, destination]);
 
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError('');
@@ -53,7 +55,7 @@ export default function Admin({ connexion, stagiaire = false }) {
       if (!response.ok) { setError('Connexion impossible. Vérifiez vos identifiants ou réessayez plus tard.'); return; }
       const { user: connected } = await response.json();
       if (connected.role !== role) { setError('Ce compte ne dispose pas de l’accès demandé.'); return; }
-      window.location.replace(home);
+      window.location.replace(destination);
     } catch { setError('La connexion est momentanément indisponible. Réessayez dans quelques instants.'); }
     finally { setBusy(false); }
   }

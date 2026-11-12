@@ -57,9 +57,10 @@ export function createDocumentStorage(config = {}) {
     }
   }
 
-  function objectPath(key) {
+  function objectPath(key, classement) {
     if (!uuid.test(key)) throw documentError('STORAGE');
-    return path.join(objects, key + '.blob');
+    if(classement && !/^[a-zA-Z0-9_-]{1,128}\/[A-Z_]{1,64}$/.test(classement)) throw documentError('STORAGE');
+    return path.join(objects, ...(classement ? classement.split('/') : []), key + '.blob');
   }
 
   async function discardTemporary(req) {
@@ -119,14 +120,22 @@ export function createDocumentStorage(config = {}) {
     };
   }
 
-  async function promote(req, key) {
+  async function promote(req, key, classement) {
+    const destination=objectPath(key,classement);
+    if(classement){
+      let parent=objects;
+      for(const part of classement.split('/')){
+        parent=path.join(parent,part);await mkdir(parent,{recursive:true,mode:0o700});
+        const info=await lstat(parent);if(!info.isDirectory()||info.isSymbolicLink())throw documentError('STORAGE');
+      }
+    }
     const handle = await open(req.documentTemporary, 'r+');
     try { await handle.sync(); } finally { await handle.close(); }
     // Lien exclusif sur le même volume : un objet existant ne peut pas être remplacé.
-    await link(req.documentTemporary, objectPath(key));
+    await link(req.documentTemporary, destination);
     let directory;
     try {
-      directory = await open(objects, 'r');
+      directory = await open(path.dirname(destination), 'r');
       await directory.sync();
     } catch (error) {
       // Windows ne fournit pas fsync sur un descripteur de répertoire.
@@ -137,8 +146,8 @@ export function createDocumentStorage(config = {}) {
     await discardTemporary(req);
   }
 
-  async function discardObject(key) {
-    await unlink(objectPath(key)).catch(error => {if (error.code !== 'ENOENT') throw error;});
+  async function discardObject(key, classement) {
+    await unlink(objectPath(key, classement)).catch(error => {if (error.code !== 'ENOENT') throw error;});
   }
 
   // Même promotion exclusive et même audit que pour les dépôts administrateur.
@@ -152,9 +161,9 @@ export function createDocumentStorage(config = {}) {
     } finally { await discardTemporary(req); }
   }
 
-  async function openObject(key) {
+  async function openObject(key, classement) {
     await prepare();
-    const filename = objectPath(key);
+    const filename = objectPath(key, classement);
     const info = await lstat(filename);
     if (!info.isFile() || info.isSymbolicLink()) throw documentError('STORAGE');
     const handle = await open(filename, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
@@ -168,7 +177,7 @@ export function createDocumentStorage(config = {}) {
 
   async function audit(prisma, {cleanTemporary = false, ageMs = 86400000} = {}) {
     await prepare();
-    const rows = await prisma.pieceJointe.findMany({select: {id: true, stockageKey: true, taille: true, empreinte: true}});
+    const rows = await prisma.pieceJointe.findMany({select: {id: true, stockageKey: true, stockageClassement:true, taille: true, empreinte: true}});
     // Les supports pédagogiques utilisent les mêmes objets privés et les mêmes sauvegardes.
     if (prisma.supportLecon) rows.push(...await prisma.supportLecon.findMany({select:{id:true,stockageKey:true,taille:true,empreinte:true}}));
     if (prisma.videoLecon) rows.push(...await prisma.videoLecon.findMany({select:{id:true,stockageKey:true,taille:true,empreinte:true}}));
@@ -184,14 +193,24 @@ export function createDocumentStorage(config = {}) {
       report.temporaires.push(name);
       if (cleanTemporary) {await unlink(filename);report.temporairesNettoyes++;}
     }
-    for (const name of await readdir(objects)) {
+    async function walk(directory, prefix='') {
+      const files=[];
+      for(const name of await readdir(directory)){
+        const info=await lstat(path.join(directory,name));
+        if(info.isDirectory()&&!info.isSymbolicLink()&&prefix.split('/').filter(Boolean).length<2)files.push(...await walk(path.join(directory,name),prefix+name+'/'));
+        else files.push(prefix+name);
+      }
+      return files;
+    }
+    for (const relative of await walk(objects)) {
+      const parts=relative.split('/'), name=parts.pop(), classement=parts.length?parts.join('/'):undefined;
       const key = name.replace(/\.blob$/, '');
       if (!uuid.test(key) || name !== key + '.blob') {report.inconnus++;continue;}
-      const filename = objectPath(key);
+      const filename = objectPath(key, classement);
       const info = await lstat(filename);
       if (!info.isFile() || info.isSymbolicLink()) {report.inconnus++;continue;}
       const row = references.get(key);
-      if (!row) {
+      if (!row || (row.stockageClassement || undefined)!==classement) {
         if (Date.now() - info.mtimeMs >= ageMs) report.orphelins.push(key);
         continue;
       }

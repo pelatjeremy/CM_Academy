@@ -24,6 +24,9 @@ model Formation {
   tarif                Decimal?             @db.Decimal(12, 2)
   devise               String               @default("EUR") @db.Char(3)
   financement          String               @default("")
+  reglesDocumentaires Json @default("[]")
+  documentsRevision Int @default(0)
+  documentsHistorique Json @default("[]")
   parcoursDocumentaire Boolean              @default(false)
   poleId               String?
   pole                 Pole?                @relation(fields: [poleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -312,6 +315,14 @@ model ElementDocumentaire {
   categorie     CategorieDocumentaire
   etat          EtatDocumentaire @default(A_PREPARER)
   note          String @default("") @db.VarChar(500)
+  libelle String @default("") @db.VarChar(160)
+  consigne String @default("") @db.VarChar(3000)
+  obligatoire Boolean @default(false)
+  origine String @default("ORGANISME") @db.VarChar(16)
+  demandee Boolean @default(false)
+  suiviEtat String @default("A_TRANSMETTRE") @db.VarChar(20)
+  suiviRevision Int @default(0)
+  suiviHistorique Json @default("[]")
   fichierRevision Int @default(0)
   dossier       DossierAdministratif @relation(fields: [inscriptionId], references: [inscriptionId], onDelete: Restrict)
   historique    ChangementDocumentaire[]
@@ -321,6 +332,8 @@ model ElementDocumentaire {
 }
 
 model PieceJointe {
+  deposeParStagiaire Boolean @default(false)
+  stockageClassement String? @db.VarChar(300)
   id            String @id @default(cuid())
   inscriptionId String
   categorie     CategorieDocumentaire

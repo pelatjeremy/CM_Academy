@@ -1,5 +1,13 @@
 # CMH Academy — socle local
 
+## Suivi documentaire des stagiaires
+
+La branche `feat/suivi-documents-stagiaires` étend les dossiers, versions et
+partages existants : tableau ADMIN « Suivi des documents », rubrique stagiaire
+« Mes documents », dépôt privé et correction/validation par version.
+La migration est préparée, sans application à une base existante ni déploiement.
+Voir [le fonctionnement, les tests isolés et la recette manuelle](backend/docs/suivi-documents-stagiaires.md).
+
 ## Démonstration Camille
 
 La branche `feat/demo-camille` prépare une démonstration fictive indépendante,

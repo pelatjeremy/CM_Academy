@@ -31,7 +31,7 @@ function App() {
   const path = window.location.pathname.replace(/\/+$/, '');
   if (path === '/stagiaire/activation') return <Activation />;
   if (path === '/stagiaire/connexion') return <Admin connexion stagiaire />;
-  if (path === '/stagiaire' || /^\/stagiaire\/inscriptions\/[^/]+(?:\/questionnaires\/[^/]+|\/parcours(?:\/[^/]+)?)?$/.test(path)) return <Admin connexion={false} stagiaire />;
+  if (path === '/stagiaire' || /^\/stagiaire\/inscriptions\/[^/]+(?:\/documents|\/questionnaires\/[^/]+|\/parcours(?:\/[^/]+)?)?$/.test(path)) return <Admin connexion={false} stagiaire />;
   if (path === '/admin/connexion') return <Admin connexion />;
   if (path === '/admin' || path.startsWith('/admin/')) return <Admin connexion={false} />;
   if (path === '/formations') return <PublicLayout title="Nos formations — CMH Academy"><Formations standalone /></PublicLayout>;

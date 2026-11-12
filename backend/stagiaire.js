@@ -72,7 +72,7 @@ export function espaceStagiaire(prisma, storage) {
           },
         },
         select: {
-          stockageKey: true,
+          stockageKey: true, stockageClassement:true,
           nomOriginal: true,
           taille: true,
           typeMime: true,

@@ -60,7 +60,7 @@ try {
     transactionDiagnostics.push({step,code:error.code||error.name,metaCode:error.meta?.code,driverKind:error.meta?.driverAdapterError?.cause?.kind||error.cause?.kind,originalCode:error.meta?.driverAdapterError?.cause?.originalCode||error.cause?.originalCode});
     writeFileSync(path.join(fixture.run,'transaction-diagnostics.json'),JSON.stringify(transactionDiagnostics,null,2));throw error;
   }};
-  assert.equal((await fixture.sql('SELECT count(*)::int AS n FROM _prisma_migrations WHERE finished_at IS NOT NULL')).rows[0].n,14);
+  assert.equal((await fixture.sql('SELECT count(*)::int AS n FROM _prisma_migrations WHERE finished_at IS NOT NULL')).rows[0].n,15);
   cli('migrate','diff','--from-config-datasource','--to-schema',schemaPath,'--exit-code');
   pass('migration SQL réelle appliquée ; schéma valide et client isolé généré');
   if(process.argv.includes('--elearning')) {
@@ -226,7 +226,12 @@ try {
     const {testVideos}=await import('./lib/test-videos.mjs');
     await testVideos({prisma,client,pass,run:fixture.run,fixture,getBase:()=>base,restart:async options=>{await stop();await start(options);}});
   }
-  if(process.argv.includes('--browser')||process.argv.includes('--video-browser')) {
+  if(process.argv.includes('--suivi-documents')) {
+    step='suivi documentaire stagiaire';
+    const {testSuiviDocuments}=await import('./lib/test-suivi-documents.mjs');
+    await testSuiviDocuments({prisma,client,pass,run:fixture.run,getBase:()=>base});
+  }
+  if(process.argv.includes('--browser')||process.argv.includes('--video-browser')||process.argv.includes('--documents-browser')) {
     step='navigateur';
     const frontend=path.resolve(backend,'../frontend');const require=createRequire(path.join(frontend,'package.json'));
     const {createServer}=await import(pathToFileURL(require.resolve('vite')).href);
@@ -242,7 +247,10 @@ try {
     await vite.close();vite=await createServer({configFile:false,root:frontend,plugins:[react(),testFailures],server:{fs:{allow:[frontend,path.resolve(backend,'../shared')]},host:'127.0.0.2',port:Number(new URL(browserOrigin).port),strictPort:true,proxy:{'/api':{target:base,changeOrigin:true}}}});await vite.listen();
     writeFileSync(path.join(fixture.run,'browser.json'),JSON.stringify({email:admin.email,password,origin:browserOrigin}),{mode:0o600});
     console.log(`NAVIGATEUR ${browserOrigin}/admin/connexion`);console.log(`DOSSIER ${fixture.run}`);
-    if(process.argv.includes('--video-browser')) {
+    if(process.argv.includes('--documents-browser')) {
+      const {testDocumentsBrowser}=await import('./lib/test-documents-browser.mjs');
+      await testDocumentsBrowser({origin:browserOrigin,run:fixture.run,adminEmail:admin.email,adminPassword:password,pass,prisma});
+    } else if(process.argv.includes('--video-browser')) {
       const {testVideosBrowser}=await import('./lib/test-videos-browser.mjs');
       await testVideosBrowser({origin:browserOrigin,run:fixture.run,adminEmail:admin.email,adminPassword:password,pass,prisma});
     } else while(!existsSync(path.join(fixture.run,'stop-browser'))) await new Promise(resolve=>setTimeout(resolve,500));

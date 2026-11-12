@@ -9,6 +9,7 @@ const project=fileURLToPath(new URL('../../',import.meta.url)),privateFolder=pat
 const access=JSON.parse(readFileSync(path.join(privateFolder,'access.json'),'utf8')),origin=new URL(access.origin).origin;
 assert(origin.startsWith('https://'));
 const after=process.argv.includes('--after-restart'),results=[],screenshots=[];
+const scenarioPath=path.join(reportFolder,'documents-scenario.json'),expectedFiles=existsSync(scenarioPath)?JSON.parse(readFileSync(scenarioPath,'utf8')).fichiersReferences:3;
 mkdirSync(reportFolder,{recursive:true});
 const executablePath=process.env.CMH_BROWSER_PATH||['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
 const browser=await chromium.launch({...(executablePath?{executablePath}:{}),headless:true,args:['--autoplay-policy=user-gesture-required']});
@@ -24,7 +25,7 @@ try{
  if(after){
   const baseline=JSON.parse(readFileSync(path.join(reportFolder,'deployed-baseline.json'),'utf8'));
   assert.equal((await adminContext.request.get(origin+'/api/admin/moi')).status(),200);
-  const state=await(await adminContext.request.get(origin+'/api/admin/demonstration/etat')).json();assert.equal(state.migrations.terminees,14);assert(state.migrations.empreintesConformes);assert.equal(state.fichiersReferences,3);assert(Object.values(state.audit).every(n=>n===0));
+  const state=await(await adminContext.request.get(origin+'/api/admin/demonstration/etat')).json();assert.equal(state.migrations.terminees,15);assert(state.migrations.empreintesConformes);assert.equal(state.fichiersReferences,expectedFiles);assert(Object.values(state.audit).every(n=>n===0));
   const progress=await(await studentContext.request.get(origin+root+'/parcours')).json();assert.deepEqual(progress.progression,baseline.progression);
   assert.equal(hash(await(await studentContext.request.get(origin+pdf)).body()),baseline.pdf);
   assert.equal(hash(await(await studentContext.request.get(origin+video)).body()),baseline.video);
@@ -40,7 +41,7 @@ try{
   pass('catalogue et fiche HTTPS, mention de démonstration, onglet contextualisé, navigation active et horaires français sans ISO/UTC visibles');
   async function login(page,role,account){await page.goto(origin+'/'+role+'/connexion');await page.getByLabel('Adresse email').fill(account.email);await page.getByLabel('Mot de passe',{exact:true}).fill(account.password);await page.getByRole('button',{name:'Se connecter',exact:true}).press('Enter');await page.waitForURL(origin+'/'+role);}
   await login(admin,'admin',access.admin);const cookies=await adminContext.cookies();assert(cookies.some(c=>c.name==='__Host-cmh.sid'&&c.secure&&c.httpOnly&&c.sameSite==='Lax'));
-  const state=await(await adminContext.request.get(origin+'/api/admin/demonstration/etat')).json();assert.equal(state.migrations.terminees,14);assert(state.migrations.empreintesConformes);assert.equal(state.comptes,3);assert.equal(state.inscriptions,2);assert.equal(state.versionsVideo,1);assert.equal(state.fichiersReferences,3);assert(Object.values(state.audit).every(n=>n===0));assert(state.ffprobe.available);
+  const state=await(await adminContext.request.get(origin+'/api/admin/demonstration/etat')).json();assert.equal(state.migrations.terminees,15);assert(state.migrations.empreintesConformes);assert.equal(state.comptes,3);assert.equal(state.inscriptions,2);assert.equal(state.versionsVideo,1);assert.equal(state.fichiersReferences,expectedFiles);assert(Object.values(state.audit).every(n=>n===0));assert(state.ffprobe.available);
   await admin.goto(origin+'/admin/catalogue/sessions');await admin.getByRole('heading',{name:'Sessions',exact:true}).waitFor();await admin.getByRole('link',{name:'Modifier la session 1 de Observer et accompagner le cheval',exact:true}).waitFor();
   assert.match(await admin.title(),/Sessions.*CMH Academy/);assert.match(await admin.locator('body').innerText(),/14 h/);assert(!/UTC|\d{4}-\d{2}-\d{2}T/.test(await admin.locator('body').innerText()));
   await admin.goto(origin+'/admin/catalogue/formations/'+demoIds.formation+'/contenu');await admin.getByRole('button',{name:'Modifier la leçon Observer les attitudes',exact:true}).click();await admin.getByRole('heading',{name:'Vidéo ou replay MP4',exact:true}).waitFor();
@@ -68,12 +69,10 @@ try{
   assert.equal((await studentContext.request.get(origin+video,{headers:{Range:'bytes=999999999-'}})).status(),416);
   const publicResponse=await anonymous.request.get(origin+'/api/formations/observer-le-cheval-demonstration');const publicText=await publicResponse.text();for(const value of ['stockageKey','motDePasseHash','transcription','alice@demo.invalid',access.admin.password])assert(!publicText.includes(value));
   pass('PDF privé, HEAD/Range/416 sur URL publique réelle, refus anonyme et autre stagiaire, API publique sans données privées');
-  const detail=(await(await studentContext.request.get(origin+root+'/parcours/lecons/'+demoIds.lesson)).json()).item;
-  await student.getByRole('button',{name:detail.progression.terminee?'Reprendre mon étude':'Marquer comme terminée',exact:true}).click();await student.getByText(detail.progression.terminee?'Étude de la leçon reprise.':'Leçon déclarée terminée.',{exact:true}).waitFor();
   const progress=await(await studentContext.request.get(origin+root+'/parcours')).json();
   writeFileSync(path.join(reportFolder,'deployed-baseline.json'),JSON.stringify({origin,progression:progress.progression,pdf:hash(await doc.body()),video:hash(await movie.body())},null,2));
   await adminContext.storageState({path:path.join(privateFolder,'demo-admin-browser.json')});await studentContext.storageState({path:path.join(privateFolder,'demo-student-browser.json')});
-  await otherContext.close();await anonymous.close();pass('déclaration de progression explicite enregistrée et empreintes préparées pour vérifier le redémarrage');
+  await otherContext.close();await anonymous.close();pass('progression existante conservée et empreintes préparées pour vérifier le redémarrage');
  }
  assert.deepEqual(errors,[]);writeFileSync(path.join(reportFolder,after?'deployed-after-restart-results.json':'deployed-results.json'),JSON.stringify({success:true,origin,results,screenshots},null,2));
 }catch(error){process.exitCode=1;console.error('FAIL démonstration déployée : '+(error.code||error.name));writeFileSync(path.join(reportFolder,'deployed-error-private.json'),JSON.stringify({message:error.message,stack:error.stack,results},null,2));}

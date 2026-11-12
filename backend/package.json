@@ -32,7 +32,9 @@
     "test:format": "node scripts/test-format-fr.mjs",
     "test:demo": "node scripts/test-demo.mjs",
     "demo:migrate": "node scripts/migrate-demo.mjs",
-    "demo:seed": "node scripts/seed-demo.mjs --confirm-demo-only"
+    "demo:seed": "node scripts/seed-demo.mjs --confirm-demo-only",
+    "test:suivi-documents": "node scripts/test-auth.mjs --suivi-documents",
+    "test:suivi-documents:browser": "node scripts/test-auth.mjs --suivi-documents --documents-browser"
   },
   "keywords": [],
   "author": "",

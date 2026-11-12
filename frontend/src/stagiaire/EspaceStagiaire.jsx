@@ -1,3 +1,4 @@
+import DocumentsInscription from '../documents/DocumentsInscription';
 import PresenceSynthese from '../presences/PresenceSynthese';
 import ParcoursPedagogique from '../pedagogie/ParcoursPedagogique';
 import ExitDialog from '../components/ExitDialog';
@@ -9,7 +10,8 @@ import {formatParis,plageFr} from '../admin/session-time';
 import {statutsInscription,categories} from '../admin/dossier-labels';
 import '../admin/admin.css';
 export default function EspaceStagiaire({user,onLogout,busy,error}){
- const match=window.location.pathname.match(/^\/stagiaire\/inscriptions\/([^/]+)(?:\/(questionnaires|parcours)(?:\/([^/]+))?)?$/);
+ const match=window.location.pathname.match(/^\/stagiaire\/inscriptions\/([^/]+)(?:\/(questionnaires|parcours|documents)(?:\/([^/]+))?)?$/);
+ const documents=match?.[2]==='documents';
  const id=match?.[1],questionnaireId=match?.[2]==='questionnaires'?match[3]:null,parcours=match?.[2]==='parcours',leconId=parcours?match?.[3]:null;
  const [dirty,setDirty]=useState(false),[exit,setExit]=useState(null);const allowExit=useRef(false);
  useEffect(()=>{if(!dirty)return;const warn=e=>{if(!allowExit.current){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
@@ -19,18 +21,18 @@ export default function EspaceStagiaire({user,onLogout,busy,error}){
 
  const [state,setState]=useState({loading:true}),[attempt,setAttempt]=useState(0);
  useEffect(()=>{
-  if(!parcours)document.title=(questionnaireId?'Questionnaire':id?'Ma formation':'Mes formations')+' — Espace stagiaire — CMH Academy';
+  if(!parcours)document.title=(documents?'Mes documents':questionnaireId?'Questionnaire':id?'Ma formation':'Mes formations')+' — Espace stagiaire — CMH Academy';
   const controller=new AbortController();
   adminRequest('/api/stagiaire/inscriptions'+(id?'/'+encodeURIComponent(id):''),{signal:controller.signal})
    .then(data=>{if(!controller.signal.aborted)setState({data});})
    .catch(err=>{if(!controller.signal.aborted)setState({error:err.message});});
   return()=>controller.abort();
- },[id,attempt,parcours,questionnaireId]);
+ },[id,attempt,parcours,questionnaireId,documents]);
  return <div className="admin-workspace" onClickCapture={navigate}>
   {exit&&<ExitDialog onStay={()=>setExit(null)} onLeave={leave}/>}
   <a className="skip-link" href="#stagiaire-content">Aller au contenu</a>
   <aside className="admin-sidebar"><a className="admin-brand" href="/stagiaire">CMH <span>Academy</span></a><p>Espace stagiaire</p>
-   <nav aria-label="Espace stagiaire"><a href="/stagiaire" aria-current={!id?'page':undefined}>Mes formations</a>{id&&<><a href={'/stagiaire/inscriptions/'+id} aria-current={!parcours&&!questionnaireId?'page':undefined}>Ma formation</a>{state.data?.item?.statut==='CONFIRMEE'&&<a href={'/stagiaire/inscriptions/'+id+'/parcours'} aria-current={parcours?'page':undefined}>Parcours pédagogique</a>}</>}</nav>
+   <nav aria-label="Espace stagiaire"><a href="/stagiaire" aria-current={!id?'page':undefined}>Mes formations</a>{id&&<><a href={'/stagiaire/inscriptions/'+id+'/documents'} aria-current={documents?'page':undefined}>Mes documents</a><a href={'/stagiaire/inscriptions/'+id} aria-current={!documents&&!parcours&&!questionnaireId?'page':undefined}>Ma formation</a>{state.data?.item?.statut==='CONFIRMEE'&&<a href={'/stagiaire/inscriptions/'+id+'/parcours'} aria-current={parcours?'page':undefined}>Parcours pédagogique</a>}</>}</nav>
    <div className="admin-account"><p>{user.email}</p><button className="admin-button secondary" disabled={busy} onClick={logout}>Se déconnecter</button><a href="/">Catalogue public</a></div>
   </aside>
   <main className="admin-content" id="stagiaire-content"><h1>{state.data?.item?.session.formation.titre||'Mes formations'}</h1>
@@ -39,8 +41,8 @@ export default function EspaceStagiaire({user,onLogout,busy,error}){
    {state.loading&&<p role="status">Chargement…</p>}
    {state.error&&<div role="alert"><p>{state.error}</p><button className="admin-button" onClick={()=>{setState({loading:true});setAttempt(n=>n+1);}}>Réessayer</button> <a href="/stagiaire/connexion">Se reconnecter</a></div>}
    {state.data?.items&&<section className="admin-panel">{!state.data.items.length?<p>Aucune formation n’est encore rattachée à votre compte.</p>:<ul className="admin-resource-list">{state.data.items.map(item=><li key={item.id}><div><h2><a href={'/stagiaire/inscriptions/'+item.id}>{item.session.formation.titre}</a></h2><p>{statutsInscription[item.statut]}</p>{item.session.seances[0]&&<p>{formatParis(item.session.seances[0].debut)}</p>}</div></li>)}</ul>}</section>}
-   {state.data?.item&&(parcours?<ParcoursPedagogique inscriptionId={id} leconId={leconId}/>:questionnaireId?<QuestionnaireReponses inscriptionId={id} id={questionnaireId} setDirty={setDirty}/>:<>
-    {state.data.item.statut==='CONFIRMEE'&&<p><a className="admin-button" href={'/stagiaire/inscriptions/'+id+'/parcours'}>Ouvrir le parcours pédagogique</a></p>}
+   {state.data?.item&&(documents?<><DocumentsInscription id={id} stagiaire setDirty={setDirty}/><section className="admin-panel"><h2>Documents fournis par l’organisme</h2>{!state.data.fichiers.length?<p>Aucun document partagé.</p>:<ul>{state.data.fichiers.map(f=><li key={f.id}><a download href={'/api/stagiaire/inscriptions/'+id+'/fichiers/'+f.id+'/telecharger'}>{f.nomOriginal} · version {f.version}</a></li>)}</ul>}</section></>:parcours?<ParcoursPedagogique inscriptionId={id} leconId={leconId}/>:questionnaireId?<QuestionnaireReponses inscriptionId={id} id={questionnaireId} setDirty={setDirty}/>:<>
+    <p><a className="admin-button" href={'/stagiaire/inscriptions/'+id+'/documents'}>Mes documents</a></p>{state.data.item.statut==='CONFIRMEE'&&<p><a className="admin-button" href={'/stagiaire/inscriptions/'+id+'/parcours'}>Ouvrir le parcours pédagogique</a></p>}
     <PresenceSynthese id={id}/>
     <QuestionnairesInscription id={id}/>
     <section className="admin-panel"><h2>Votre session</h2><p>Statut : {statutsInscription[state.data.item.statut]}</p><p>{state.data.item.session.formation.description}</p>

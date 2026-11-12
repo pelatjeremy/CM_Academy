@@ -1,3 +1,4 @@
+import {suiviDocuments} from './suivi-documents.js';
 import { adminPresences } from './admin/presences.js';
 import { adminPedagogie } from './admin/pedagogie.js';
 import { pedagogieStagiaire } from './pedagogie-stagiaire.js';
@@ -83,6 +84,9 @@ export async function createApp(options) {
     '/api/stagiaire',
     espaceStagiaire(prisma, createDocumentStorage(options.documentStorage))
   );
+  app.use('/api/admin', suiviDocuments(prisma, createDocumentStorage(options.documentStorage)));
+  app.use('/api/stagiaire', suiviDocuments(prisma, createDocumentStorage(options.documentStorage), {stagiaire:true}));
+  app.use('/api/stagiaire', adminFichiers(prisma, createDocumentStorage(options.documentStorage), {stagiaire:true}));
   app.use('/api/admin', adminCatalogue(prisma));
   app.use('/api/admin', adminFormations(prisma));
   app.use('/api/admin', adminSessions(prisma));

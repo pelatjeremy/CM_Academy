@@ -33,7 +33,7 @@ try{
  const root=path.join(fixture.run,'private'),assets=await prepareDemoAssets(path.join(fixture.run,'.demo-assets'),ffmpegPath);
  assert((await seedDemo({prisma,root,assets,passwords})).created);assert.equal((await seedDemo({prisma,root,assets,passwords})).created,false);
  assert.equal(await prisma.utilisateur.count(),3);assert.equal(await prisma.inscription.count(),2);assert.equal(await prisma.leconPedagogique.count(),3);assert.equal(await prisma.videoLecon.count(),1);assert.equal((await prisma.progressionLecon.findMany()).length,1);
- pass('garde anti-base de développement, quatorze migrations isolées, jeu fictif complet et initialisation idempotente sans écrasement');
+ pass('garde anti-base de développement, quinze migrations isolées, jeu fictif complet et initialisation idempotente sans écrasement');
  await start();const admin=client(),student=client(),other=client(),anon=client();
  const conf=await(await anon.request('/api/configuration-publique')).json();assert.deepEqual(conf,{demonstration:true});
  for(const url of ['/formations','/formations/observer-le-cheval-demonstration','/admin','/stagiaire']){const r=await anon.request(url);assert.equal(r.status,200);assert((await r.text()).includes('/assets/'));assert(r.headers.get('content-security-policy').includes("frame-ancestors 'none'"));}
@@ -42,7 +42,7 @@ try{
  pass('frontend de production, mention publique minimale, fichiers privés non servis, CSP et demandes publiques désactivées sur démonstration');
  await admin.login('administration@demo.invalid',passwords.admin);await student.login('alice@demo.invalid',passwords.student);await other.login('leo@demo.invalid',passwords.other);
  const tree=await(await admin.request('/api/admin/formations/'+demoIds.formation+'/contenu')).json();assert.equal(tree.modules.length,2);assert(tree.videoProbe.available);
- const demoState=await(await admin.request('/api/admin/demonstration/etat')).json();assert.equal(demoState.migrations.terminees,14);assert(demoState.migrations.empreintesConformes);assert.equal(demoState.fichiersReferences,3);assert(Object.values(demoState.audit).every(n=>n===0));assert.equal((await anon.request('/api/admin/demonstration/etat')).status,401);assert.equal((await student.request('/api/admin/demonstration/etat')).status,403);
+ const demoState=await(await admin.request('/api/admin/demonstration/etat')).json();assert.equal(demoState.migrations.terminees,15);assert(demoState.migrations.empreintesConformes);assert.equal(demoState.fichiersReferences,3);assert(Object.values(demoState.audit).every(n=>n===0));assert.equal((await anon.request('/api/admin/demonstration/etat')).status,401);assert.equal((await student.request('/api/admin/demonstration/etat')).status,403);
  const publicBody=await(await anon.request('/api/formations/observer-le-cheval-demonstration')).text();for(const privateValue of ['stockageKey','alice@demo.invalid','demo-inscription','motDePasseHash',passwords.admin,'transcription'])assert(!publicBody.includes(privateValue));
  const prefix='/api/stagiaire/inscriptions/'+demoIds.inscription,video=prefix+'/parcours/lecons/'+demoIds.lesson+'/videos/'+demoIds.video+'/lecture',pdf=prefix+'/fichiers/'+demoIds.pdf+'/telecharger';
  for(const [c,status]of [[anon,401],[other,404],[admin,403]])for(const method of ['GET','HEAD'])assert.equal((await c.request(video,{method,headers:{Range:'bytes=0-9'}})).status,status);

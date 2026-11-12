@@ -117,3 +117,11 @@ textarea.admin-input { resize: vertical; }
 .pedagogy-video summary { cursor: pointer; padding-block: 12px; }
 .admin-attachments input[type="file"] { max-width: 100%; margin-block: 12px; }
 .admin-attachments .admin-actions { margin-block: 16px; flex-wrap: wrap; }
+.documents-table {overflow-x:auto; max-width:100%; margin-block:1.5rem;}
+.documents-table table {width:100%;border-collapse:collapse;background:#fff;}
+.documents-table th,.documents-table td {padding:.8rem;text-align:left;border-bottom:1px solid #ddd;vertical-align:top;}
+.document-consigne {white-space:pre-wrap;}
+.documents-panel fieldset {min-width:0;margin-block:1rem;}
+.documents-panel label {display:block;margin-block:.65rem;}
+.documents-panel input:not([type=checkbox]),.documents-panel textarea,.documents-panel select {max-width:100%;}
+.sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}

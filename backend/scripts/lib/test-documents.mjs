@@ -157,7 +157,7 @@ export async function testDocuments({prisma, client, pass, base, storageRoot, ru
   assert(await readFile(path.join(objects,orphan+'.blob')));
   await unlink(path.join(objects,orphan+'.blob'));
   const row=await prisma.pieceJointe.findUnique({where:{id:first.id}});
-  const actual=path.join(objects,row.stockageKey+'.blob');
+  const actual=path.join(objects,row.stockageClassement||'',row.stockageKey+'.blob');
   await rename(actual,actual+'.offline');
   try{
     assert.equal((await admin.request(root+'/'+first.id+'/telecharger')).status,503);
