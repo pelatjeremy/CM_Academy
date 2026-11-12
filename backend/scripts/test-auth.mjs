@@ -231,7 +231,12 @@ try {
     const {testSuiviDocuments}=await import('./lib/test-suivi-documents.mjs');
     await testSuiviDocuments({prisma,client,pass,run:fixture.run,getBase:()=>base});
   }
-  if(process.argv.includes('--browser')||process.argv.includes('--video-browser')||process.argv.includes('--documents-browser')) {
+  if(process.argv.includes('--dashboard-browser')) {
+    step='tableau de bord documentaire';
+    const {testDocumentDashboard}=await import('./lib/test-document-dashboard.mjs');
+    await testDocumentDashboard({prisma,client,pass,run:fixture.run});
+  }
+  if(process.argv.includes('--browser')||process.argv.includes('--video-browser')||process.argv.includes('--documents-browser')||process.argv.includes('--dashboard-browser')) {
     step='navigateur';
     const frontend=path.resolve(backend,'../frontend');const require=createRequire(path.join(frontend,'package.json'));
     const {createServer}=await import(pathToFileURL(require.resolve('vite')).href);
@@ -247,7 +252,10 @@ try {
     await vite.close();vite=await createServer({configFile:false,root:frontend,plugins:[react(),testFailures],server:{fs:{allow:[frontend,path.resolve(backend,'../shared')]},host:'127.0.0.2',port:Number(new URL(browserOrigin).port),strictPort:true,proxy:{'/api':{target:base,changeOrigin:true}}}});await vite.listen();
     writeFileSync(path.join(fixture.run,'browser.json'),JSON.stringify({email:admin.email,password,origin:browserOrigin}),{mode:0o600});
     console.log(`NAVIGATEUR ${browserOrigin}/admin/connexion`);console.log(`DOSSIER ${fixture.run}`);
-    if(process.argv.includes('--documents-browser')) {
+    if(process.argv.includes('--dashboard-browser')) {
+      const {testDocumentDashboardBrowser}=await import('./lib/test-document-dashboard-browser.mjs');
+      await testDocumentDashboardBrowser({origin:browserOrigin,run:fixture.run,adminEmail:admin.email,adminPassword:password,pass,prisma});
+    } else if(process.argv.includes('--documents-browser')) {
       const {testDocumentsBrowser}=await import('./lib/test-documents-browser.mjs');
       await testDocumentsBrowser({origin:browserOrigin,run:fixture.run,adminEmail:admin.email,adminPassword:password,pass,prisma});
     } else if(process.argv.includes('--video-browser')) {

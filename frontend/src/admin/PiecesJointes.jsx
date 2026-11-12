@@ -7,7 +7,7 @@ function tailleFichier(bytes) {
   return bytes < 1048576 ? Math.ceil(bytes / 1024) + ' Ko' : (bytes / 1048576).toLocaleString('fr-FR', {maximumFractionDigits: 2}) + ' Mo';
 }
 
-export default function PiecesJointes({inscriptionId, categorie, fichiers, onVersions, onPending}) {
+export default function PiecesJointes({inscriptionId, categorie, fichiers, onVersions, onPending, onUploaded, verificationRequise=false, summaryLabel}) {
   const base = '/api/admin/inscriptions/' + encodeURIComponent(inscriptionId) + '/dossier/elements/' + categorie + '/fichiers';
   const [open, setOpen] = useState(false);
   const [list, setList] = useState(null);
@@ -62,9 +62,10 @@ export default function PiecesJointes({inscriptionId, categorie, fichiers, onVer
       });
       // Le dépôt est confirmé même si le rafraîchissement de la liste doit être repris.
       setFile(null);depotId.current = null;input.current.value = '';onPending(categorie, false);
-      setSuccess('Pièce jointe déposée. Le suivi manuel reste à renseigner séparément.');
+      setSuccess(verificationRequise?'Version déposée. Pièce à vérifier.':'Pièce jointe déposée. Le suivi manuel reste à renseigner séparément.');
       const versions = await adminRequest(base);
       setList(versions);onVersions(categorie, versions.versions);
+      await onUploaded?.();
     } catch (err) {
       setError(err.message);
       if (err.code === 'FILE_CONFLICT') setConflict(true);
@@ -74,7 +75,7 @@ export default function PiecesJointes({inscriptionId, categorie, fichiers, onVer
   }
 
   return <details className="admin-attachments" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>Pièces jointes · {list?.versions.length ?? fichiers.length} version(s)</summary>
+    <summary>{summaryLabel||'Pièces jointes'} · {list?.versions.length ?? fichiers.length} version(s)</summary>
     {open && <>
       {!list && !error && <p role="status">Chargement des versions…</p>}
       {error && <div className="admin-notice error" role="alert"><p>{error}</p>

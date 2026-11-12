@@ -17,6 +17,7 @@ import './admin.css';
 
 export default function AdminWorkspace({ user, onLogout, busy, error }) {
   const [dirty, setDirty] = useState(false);
+  const [documentNavigationOpen,setDocumentNavigationOpen]=useState(false);
   const allowExit = useRef(false);
   const [exit, setExit] = useState(null);
   const parts = window.location.pathname.replace(/\/+$/, '').split('/').slice(1);
@@ -59,7 +60,7 @@ export default function AdminWorkspace({ user, onLogout, busy, error }) {
     {exit && <ExitDialog onStay={() => setExit(null)} onLeave={leave} />}
     <a className="skip-link" href="#admin-content">Aller au contenu</a>
     <aside className="admin-sidebar"><a className="admin-brand" href="/admin">CMH <span>Academy</span></a><p className="admin-context">Administration</p>
-      <nav aria-label="Administration"><a href="/admin/suivi-documents" aria-current={documents?"page":undefined}>Suivi des documents</a><a href="/admin" aria-current={dashboard ? 'page' : undefined}>Tableau de bord</a><a href="/admin/inscriptions" aria-current={inscriptions ? 'page' : undefined}>Inscriptions</a><a href="/admin/questionnaires" aria-current={questionnaires ? 'page' : undefined}>Questionnaires</a><p className="admin-nav-heading">Catalogue</p>
+      <button type="button" className="document-navigation-toggle admin-button secondary" aria-label="Navigation administrative" aria-expanded={documentNavigationOpen} aria-controls="admin-navigation" onClick={()=>setDocumentNavigationOpen(v=>!v)} hidden={!documents}>Navigation <span aria-hidden="true">⌄</span></button><nav id="admin-navigation" className={documents?'document-route-navigation'+(documentNavigationOpen?' is-open':''):undefined} aria-label="Administration"><a href="/admin/suivi-documents" aria-current={documents?"page":undefined}>Suivi des documents</a><a href="/admin" aria-current={dashboard ? 'page' : undefined}>Tableau de bord</a><a href="/admin/inscriptions" aria-current={inscriptions ? 'page' : undefined}>Inscriptions</a><a href="/admin/questionnaires" aria-current={questionnaires ? 'page' : undefined}>Questionnaires</a><p className="admin-nav-heading">Catalogue</p>
         {Object.entries(resources).map(([key, config]) => <a key={key} href={`/admin/catalogue/${key}`} aria-current={kind === key ? 'page' : undefined}>{config.title}</a>)}
         <a href="/admin/organisme" aria-current={organisme ? 'page' : undefined}>Organisme</a>
       </nav><div className="admin-account"><p>{user.email}</p><button className="admin-button secondary" onClick={logout} disabled={busy}>{busy ? 'Déconnexion…' : 'Se déconnecter'}</button><a href="/">Voir le catalogue public</a></div>

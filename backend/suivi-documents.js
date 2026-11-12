@@ -1,3 +1,4 @@
+import {filtreDocumentaire} from '../shared/document-dashboard.mjs';
 import {Router} from 'express';
 import {z} from 'zod';
 import {initialiserDossier,categoriesDocumentaires} from './lib/dossiers.js';
@@ -18,7 +19,7 @@ function conflict(res){return res.status(409).json({error:'Cette pièce a chang�
 export function suiviDocuments(prisma,storage,{stagiaire=false}={}){
  const router=Router(),base='/inscriptions/:id/documents';
  router.param('categorie',(req,res,next,value)=>z.enum(categoriesDocumentaires).safeParse(value).success?next():res.status(404).json({error:'Pièce introuvable.'}));
- async function accessible(tx,req){return tx.inscription.findFirst({where:{id:req.params.id,...(stagiaire?{rattachement:{utilisateurId:req.user.id}}:{})},select:{id:true,statut:true,dossier:{select:{parcoursDocumentaire:true}}}});}
+ async function accessible(tx,req){return tx.inscription.findFirst({where:{id:req.params.id,...(stagiaire?{rattachement:{utilisateurId:req.user.id}}:{})},select:{id:true,prenom:true,nom:true,statut:true,session:{select:{id:true,formation:{select:{titre:true}},seances:{select:{debut:true},orderBy:{debut:'asc'}}}},dossier:{select:{parcoursDocumentaire:true}}}});}
  if(!stagiaire){
  router.post(base+'/initialiser',async(req,res)=>{
   if(!z.object({}).strict().safeParse(req.body).success)return res.status(422).json({error:'Requête invalide.'});
@@ -30,11 +31,17 @@ export function suiviDocuments(prisma,storage,{stagiaire=false}={}){
   });if(!result)return res.status(404).json({error:'Inscription introuvable.'});res.json({message:'Dossier documentaire initialisé.'});
  });
  router.get('/suivi-documents',async(req,res)=>{
-  const q=z.object({q:z.string().max(100).optional(),formationId:z.string().max(128).optional(),sessionId:z.string().max(128).optional(),etat:z.enum(['complet','incomplet','aVerifier','aCorriger']).optional()}).strict().safeParse(req.query);
+  const q=z.object({q:z.string().max(100).optional(),formationId:z.string().max(128).optional(),sessionId:z.string().max(128).optional(),etat:z.enum(['complet','incomplet','aVerifier','aCorriger','sansPieces','aTraiter']).optional()}).strict().safeParse(req.query);
   if(!q.success)return res.status(422).json({error:'Filtres invalides.'});
   const {q:search,formationId,sessionId,etat}=q.data;
-  const rows=await prisma.inscription.findMany({where:{...(sessionId?{sessionId}:{}),...(formationId?{session:{formationId}}:{}),...(search?{OR:[{nom:{contains:search,mode:'insensitive'}},{prenom:{contains:search,mode:'insensitive'}}]}:{})},select:{id:true,prenom:true,nom:true,statut:true,session:{select:{id:true,formation:{select:{id:true,titre:true}},seances:{select:{debut:true},orderBy:{debut:'asc'}}}},dossier:{select:{parcoursDocumentaire:true,elements:{select:{demandee:true,obligatoire:true,suiviEtat:true}}}}},orderBy:{createdAt:'desc'}});
-  const items=rows.map(({dossier,...i})=>({...i,initialise:!!dossier?.parcoursDocumentaire,completude:completude(dossier?.elements||[])})).filter(i=>!etat||(etat==='complet'?i.initialise&&i.completude.complet:etat==='incomplet'?!i.initialise||!i.completude.complet:i.completude[etat]>0));
+  const rows=await prisma.inscription.findMany({where:{...(sessionId?{sessionId}:{}),...(formationId?{session:{formationId}}:{}),...(search?.trim()?{AND:search.trim().split(/\s+/).map(term=>({OR:[{nom:{contains:term,mode:'insensitive'}},{prenom:{contains:term,mode:'insensitive'}}]}))}:{})},select:{id:true,prenom:true,nom:true,statut:true,session:{select:{id:true,formation:{select:{id:true,titre:true}},seances:{select:{debut:true},orderBy:{debut:'asc'}}}},dossier:{select:{parcoursDocumentaire:true,elements:{select:{categorie:true,libelle:true,demandee:true,obligatoire:true,suiviEtat:true,suiviHistorique:true,historique:{select:{date:true}},fichiers:{select:publicFileSelect,orderBy:{version:'desc'}}}}}}},orderBy:{createdAt:'desc'}});
+  const items=rows.map(({dossier,...i})=>{
+   const elements=dossier?.elements||[],demandes=elements.filter(e=>e.demandee);
+   const dates=elements.flatMap(e=>[...e.fichiers.map(f=>f.date),...e.suiviHistorique.map(h=>h.date),...e.historique.map(h=>h.date)]).map(d=>new Date(d).getTime()).filter(Number.isFinite);
+   const depots=elements.flatMap(e=>e.fichiers.map(f=>({categorie:e.categorie,libelle:e.libelle,fichier:f.nomOriginal,date:f.date,version:f.version}))).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
+   const corrections=demandes.filter(e=>e.suiviEtat==='A_CORRIGER').map(e=>{const h=e.suiviHistorique.filter(h=>h.type==='DECISION'&&h.etat==='A_CORRIGER').at(-1);return {categorie:e.categorie,libelle:e.libelle,motif:h?.motif||'',date:h?.date||null};});
+   return {...i,initialise:!!dossier?.parcoursDocumentaire,completude:completude(elements),actions:{aVerifier:demandes.filter(e=>e.suiviEtat==='A_VERIFIER').length,aCorriger:corrections.length},derniereActivite:dates.length?new Date(Math.max(...dates)).toISOString():null,activite:{depots,corrections}};
+  }).filter(i=>filtreDocumentaire(i,etat));
   const formations=await prisma.formation.findMany({select:{id:true,titre:true},orderBy:{titre:'asc'}});
   const sessions=await prisma.session.findMany({where:formationId?{formationId}:{},select:{id:true,formationId:true,seances:{select:{debut:true},orderBy:{debut:'asc'}}}});
   res.json({items,formations,sessions});
@@ -80,7 +87,8 @@ export function suiviDocuments(prisma,storage,{stagiaire=false}={}){
   const elements=await prisma.elementDocumentaire.findMany({where:{inscriptionId:i.id,...(stagiaire?{demandee:true,origine:'STAGIAIRE'}:{})},select:{...suiviSelect,fichiers:{where:stagiaire?{deposeParStagiaire:true}:{},select:publicFileSelect,orderBy:{version:'desc'}}},orderBy:{categorie:'asc'}});
   // Les changements de configuration et notes internes ne sont pas un message au stagiaire.
   const items=elements.map(e=>({...e,suiviHistorique:stagiaire?e.suiviHistorique.filter(h=>h.type==='DEPOT'||h.type==='DECISION').map(({type,date,version,etat,motif,role})=>({type,date,version,etat,motif,role})):e.suiviHistorique}));
-  res.json({items,limiteOctets:storage.maxFileBytes,modifiable:!['ANNULEE','REFUSEE'].includes(i.statut),completude:stagiaire?undefined:completude(elements)});
+  const inscription=stagiaire?undefined:{id:i.id,prenom:i.prenom,nom:i.nom,statut:i.statut,session:i.session};
+  res.json({items,inscription,limiteOctets:storage.maxFileBytes,modifiable:!['ANNULEE','REFUSEE'].includes(i.statut),completude:stagiaire?undefined:completude(elements)});
  });
  return router;
 }
