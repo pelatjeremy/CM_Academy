@@ -148,3 +148,41 @@ compteurs, ordre, accordéons et validation), puis `auth-HszXdG` (régression
 existante avec configuration, transfert interrompu, remplacement et validation).
 Lint et build frontend réussis. Captures remplacées dans le répertoire indiqué
 ci-dessus. Aucune modification de base existante, aucun déploiement.
+
+## Publication de la démonstration — 12 novembre 2026
+
+Commit applicatif publié et déployé : `35482b811c4e1679ccc5652435b4e8047c20e0d2`.
+Railway : déploiement `81426ad6-beb1-4b59-9b58-2263aa7799cc`, état SUCCESS,
+branche `codex/tableau-bord-suivi-documents`, environnement demonstration.
+URL : https://cmh-academy-demo-demonstration.up.railway.app
+
+Aucune migration nouvelle ni réinitialisation. Même service, volumes, variables
+et commandes. Aucun réensemencement, compte, fichier ou état documentaire ajouté.
+La base locale existante n’a pas été utilisée. La source reste épinglée au commit
+applicatif ; la correction des sélecteurs de recette ne nécessite pas de déploiement.
+
+Recette exécutée : `node scripts/test-dashboard-deployed.mjs --baseline` avant
+bascule, puis `node scripts/test-dashboard-deployed.mjs` après déploiement.
+Résultat final réussi après correction de deux sélecteurs de test (pagination et
+motif également présent dans l’historique replié), sans changement applicatif.
+
+- Connexion ADMIN réelle au clavier ; indicateurs 2 dossiers, 1 complet,
+  1 pièce à vérifier, 1 dossier manquant/à corriger.
+- Recherche, formation, session, états, pagination et retour avec filtres conservés.
+- Tri des états, séparation stagiaire/organisme, lignes fermées initialement,
+  motif visible, téléchargement réel et formulaire de vérification ouvert.
+- Ordinateur 1680 px, mobile 390 px, navigation clavier, dates avec heure,
+  absence de débordement global ; captures inspectées.
+- Espace stagiaire, lien direct après connexion, téléchargements des versions,
+  refus anonyme et isolation entre les deux stagiaires.
+- Comparaison des règles, états, historiques, versions, partages et SHA256 des
+  fichiers avant/après identique. 3 comptes, 2 inscriptions, 9 fichiers référencés,
+  15 migrations aux empreintes conformes ; audit stockage entièrement à zéro.
+
+Limites : seulement deux inscriptions existantes, donc une page. La seconde page
+et le cas complet avec correction facultative ont été validés en environnement
+isolé ; aucune donnée distante n’a été ajoutée pour les reproduire. Le formulaire
+de vérification a été ouvert sans enregistrer de décision, afin de conserver les
+états existants. Aucun appareil mobile physique.
+
+Rapport et captures privés hors Git : `.demo-environment/dashboard-release/`.
