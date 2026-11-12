@@ -42,6 +42,7 @@ export async function seedDemo({prisma,root,assets,passwords,now=new Date()}){
     await tx.rattachementStagiaire.create({data:{inscriptionId:id,utilisateurId,invitationId:invitation.id}});
    }
    await tx.pieceJointe.create({data:{id:demoIds.pdf,inscriptionId:demoIds.inscription,categorie:'PROGRAMME',version:1,...programme,nomOriginal:'programme-demonstration.pdf',typeMime:'application/pdf',partageStagiaire:true,partageRevision:1,auteurId:'demo-admin'}});
+   await tx.elementDocumentaire.update({where:{inscriptionId_categorie:{inscriptionId:demoIds.inscription,categorie:'PROGRAMME'}},data:{fichierRevision:1}});
    await tx.partagePieceJointe.create({data:{fichierId:demoIds.pdf,partage:true,auteurId:'demo-admin'}});
    await tx.parcoursPedagogique.create({data:{formationId:demoIds.formation}});
    for(const [ordre,id,titre]of [[0,'demo-module-observer','Observer le cheval'],[1,'demo-module-preparer','Préparer et synthétiser']])await tx.modulePedagogique.create({data:{id,formationId:demoIds.formation,titre,ordre,publie:true}});

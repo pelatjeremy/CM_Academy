@@ -170,4 +170,3 @@ try{
  if(restoredPrisma)await restoredPrisma.$disconnect().catch(()=>{});if(fixture)await fixture.close().catch(()=>{});await db.end().catch(()=>{});
  console.log('Sauvegarde et diagnostics : '+folder);
 }
-

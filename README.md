@@ -5,7 +5,11 @@
 La branche `feat/suivi-documents-stagiaires` étend les dossiers, versions et
 partages existants : tableau ADMIN « Suivi des documents », rubrique stagiaire
 « Mes documents », dépôt privé et correction/validation par version.
-La migration est préparée, sans application à une base existante ni déploiement.
+La migration `20261112120000_suivi_documents` a été appliquée localement et à la
+démonstration existante après sauvegardes conjointes et restaurations isolées
+vérifiées. Les deux bases ont quinze migrations, sans divergence. Aucun jeu
+fictif n’a été ajouté à `cmh_academy_dev`. La démonstration reste sur ses crédits
+d’essai et son service est épinglé au commit applicatif `61aebcc`.
 Voir [le fonctionnement, les tests isolés et la recette manuelle](backend/docs/suivi-documents-stagiaires.md).
 
 ## Démonstration Camille

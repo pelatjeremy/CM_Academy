@@ -22,6 +22,11 @@ try{
  }else{
   phase='scénario fictif';await apiLogin(admin,access.admin);await apiLogin(other,access.other);const setup=await browser.newContext();contexts.push(setup);await apiLogin(setup,access.student);
   const id=demoIds.inscription,leo=demoIds.otherInscription;
+  const historical=(await items(admin,id)).items.find(e=>e.categorie==='PROGRAMME');
+  if(historical.fichierRevision===0&&historical.fichiers.length===1&&historical.fichiers[0].id===demoIds.pdf&&historical.fichiers[0].version===1){
+   remote(`import {Client} from 'pg';const db=new Client({connectionString:process.env.DATABASE_URL});await db.connect();if((await db.query('SELECT current_database() AS n')).rows[0].n!=='cmh_academy_demo')throw Error('DB');const r=await db.query('UPDATE "ElementDocumentaire" SET "fichierRevision"=1 WHERE "inscriptionId"=$1 AND categorie=$2 AND "fichierRevision"=0 AND EXISTS(SELECT 1 FROM "PieceJointe" WHERE id=$3 AND "inscriptionId"=$1 AND categorie=$2 AND version=1)',['demo-inscription-alice','PROGRAMME','demo-programme-v1']);if(r.rowCount!==1)throw Error('HISTORICAL_COUNTER_GUARD');await db.end();console.log(JSON.stringify({historicalCounterReconciled:true}));`);
+   pass('Compteur technique du PDF fictif historique réconcilié avec son unique version existante ; fichier et partage inchangés');
+  }
   for(const [cat,label,required,source]of [['CONVENTION_CONTRAT','Contrat fictif à signer',true],['SATISFACTION_FROID','Autorisation fictive à transmettre',true],['POSITIONNEMENT','Fiche fictive à vérifier',true],['REGLEMENT_INTERIEUR','Accord fictif à corriger',true],['ENTRETIEN_INITIAL','Fiche fictive validée',true],['EVALUATIONS','Pièce facultative fictive',false],['PROGRAMME','Programme fourni par l’organisme',false,'ORGANISME']])await rule(admin,id,cat,label,required,source);
   for(const cat of ['POSITIONNEMENT','REGLEMENT_INTERIEUR','ENTRETIEN_INITIAL']){const e=(await items(admin,id)).items.find(e=>e.categorie===cat);if(!e.fichierRevision)await upload(setup,id,cat,cat.toLowerCase()+'-fictif.pdf');}
   await decide(admin,id,'REGLEMENT_INTERIEUR','A_CORRIGER','Complétez la mention fictive de lecture.');await decide(admin,id,'ENTRETIEN_INITIAL','VALIDE');await decide(admin,id,'PROGRAMME','VALIDE');

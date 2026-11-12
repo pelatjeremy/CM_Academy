@@ -1,8 +1,8 @@
 # Suivi des documents des stagiaires
 
 Branche : `feat/suivi-documents-stagiaires`, créée depuis la démonstration validée
-`feat/demo-camille` au commit `1264b85`. Aucun déploiement, aucune écriture dans
-`cmh_academy_dev` ou la démonstration distante.
+`feat/demo-camille` au commit `1264b85`. Le développement initial a été vérifié
+uniquement en isolation ; l’intégration autorisée du 12 novembre est consignée ci-dessous.
 
 ## Réutilisation de l’existant
 
@@ -208,3 +208,90 @@ dumps, PDF fictifs, captures, cookies et clés restent exclus de Git et de l’i
 La recette d’annulation vérifie le refus de dépôt et l’accès pédagogique retiré ;
 la consultation des propres documents reste autorisée selon les règles existantes.
 Les tests restaurent le compte et l’inscription fictifs concernés à leur état initial.
+
+## Résultat de l’intégration autorisée
+
+Migration `20261112120000_suivi_documents` appliquée seule localement et sur
+`cmh_academy_demo` avec le mécanisme Prisma existant, sans reset, db push ni seed.
+Quinze migrations terminées, aucune divergence ; valeurs nouvelles non demandées,
+aucune validation et aucune règle créées automatiquement lors de la migration.
+
+Sauvegardes privées vérifiées :
+
+- Locale : `.local-backups/suivi-documents-20261112-uI4u6x`, PostgreSQL + stockage,
+  restauration sur cluster neuf, données et empreintes identiques, audit propre.
+- Distante : `.local-backups/demo-documents-20261112-VfDbv9`, PostgreSQL + stockage
+  sous pause applicative bornée, restauration sur cluster neuf et répétition de la
+  migration ; audit propre. Aucun secret de connexion extrait de Railway.
+
+Ces dossiers sont sous `backend`, exclus de Git et de l’image. Le dump distant
+et les trois objets initiaux sont sauvegardés ; leur présence et leurs empreintes
+ont été vérifiées avant migration, après migration, puis après déploiement.
+
+| Contrôle | Avant | Après migration | Après scénario fictif |
+| --- | ---: | ---: | ---: |
+| Migrations locales | 14 | 15 | 15 |
+| Lignes métier locales | 8 | 8 | 8 |
+| Inscriptions locales / fichiers privés locaux | 0 / 0 | 0 / 0 | 0 / 0 |
+| Migrations de démonstration | 14 | 15 | 15 |
+| Comptes / inscriptions de démonstration | 3 / 2 | 3 / 2 | 3 / 2 |
+| Versions `PieceJointe` | 1 | 1 | 7 |
+| Partages documentaires | 1 | 1 | 1 |
+| Fichiers privés référencés | 3 | 3 | 9 |
+| Octets du stockage privé | 2 737 412 | 2 737 412 | 2 745 920 |
+
+Les six nouveaux fichiers sont des PDF entièrement fictifs de recette. Les
+comptes, mots de passe, inscriptions, séances, présences, leçons, progression,
+support PDF et vidéo préexistants sont conservés. Le compteur technique du PDF
+historique avait été initialisé à zéro malgré une version 1 existante : il a été
+réconcilié uniquement sur cette pièce fictive, sans remplacer le fichier ou changer
+son partage. Le seed destiné aux futures installations isolées est corrigé ; il
+n’a pas été relancé sur une base existante.
+
+Commit applicatif publié et déployé : `61aebcc6fe7c775d63f7454754bcdb51218fbe00`,
+branche `feat/suivi-documents-stagiaires`. Railway, service applicatif existant,
+déploiement `2a279ac2-81d6-44d8-bd13-11911fa76c27`, état `SUCCESS`.
+URL : https://cmh-academy-demo-demonstration.up.railway.app.
+Le commit a été épinglé explicitement après migration ; le push n’a pas déclenché
+de déploiement automatique. La validation à deux facteurs a été effectuée par
+l’utilisateur dans Railway. Aucun merge dans `main`, aucune nouvelle ressource,
+aucune augmentation de quota ni activation d’abonnement. Crédits d’essai utilisés.
+Les derniers ajustements de recette, du seed isolé et de cette documentation sont
+sauvegardés séparément ; ils ne nécessitent pas de reconstruire l’application.
+
+Contrôles réellement passés sur l’URL HTTPS :
+
+- Scénario conservant les quatre états ; Alice : 2/5 obligatoires validées,
+  1 manquante, 1 à vérifier, 1 à corriger. Léo : obligatoire validée et facultative
+  absente, dossier complet.
+- Recherche, filtres formation/session/état et compteurs du tableau ADMIN.
+- Documents fournis par l’organisme séparés des demandes au stagiaire.
+- Lien direct avant connexion, connexion et retour à « Mes documents ».
+- Dépôt, correction motivée, remplacement, validation : deux versions du contrat,
+  téléchargement et historique auteur/date/version conservés.
+- Téléchargements protégés, isolation de deux stagiaires, rôle ADMIN, refus anonyme,
+  CSRF, compte désactivé ; annulation interdit dépôt et parcours. Compte et statut
+  temporaires de test restaurés, aucun mot de passe changé.
+- Mobile 390 px, clavier, catalogue, parcours, PDF, lecture MP4 réelle, déplacement
+  à 8 secondes, HEAD/Range/416, absence de progression automatique.
+- Redémarrage du seul service applicatif, sans reconstruction ni redémarrage de
+  PostgreSQL : sessions, données, états, décisions, versions et empreintes
+  inchangés, puis déconnexions normales testées. Audit des neuf objets sans anomalie.
+- Clé SSH temporaire révoquée après les contrôles ; ses copies privées supprimées.
+
+Contrôles locaux et isolés exécutés pendant l’intégration : tableau ADMIN vide et
+mobile en lecture seule, absence d’écriture métier, `test:demo` (relancé après la
+correction du compteur du seed), `test:format`, lint/build frontend et syntaxe des
+110 fichiers JavaScript/MJS backend. Les suites documentaires et e-learning déjà
+réussies au développement n’ont pas été rejouées sans modification de leur périmètre.
+Rapports et captures de l’URL réelle : `.demo-environment/documents-deployed-results.json`,
+`documents-deployed-after-restart-results.json`, `deployed-results.json` et
+`deployed-after-restart-results.json`, hors Git.
+
+Limites : appareils physiques iOS/Android, charge et audit de sécurité exhaustif
+non effectués. La consultation des propres documents d’une inscription annulée
+reste permise conformément à la règle documentaire existante ; le dépôt est interdit
+et le parcours pédagogique inaccessible. L’environnement d’essai conserve ses
+limites et sa date d’expiration ; aucun engagement payant n’a été ajouté.
+Les volumes Railway alloués restent inchangés : PostgreSQL 256 Mo et stockage
+applicatif privé 128 Mo, une réplique par service, sans nouvelle ressource.
