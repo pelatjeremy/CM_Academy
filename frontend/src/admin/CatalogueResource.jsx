@@ -1,3 +1,4 @@
+import AdminTable from './AdminTable';
 import { useEffect, useRef, useState } from 'react';
 import { adminRequest } from './api';
 import { resources } from './resources';
@@ -9,7 +10,7 @@ export function ResourceList({ kind }) {
   const [result, setResult] = useState({ state: 'chargement', items: [], total: 0 });
   const [retry, setRetry] = useState(0);
   const [poleId, setPoleId] = useState('');
-  const [publication, setPublication] = useState('');
+  const [publication, setPublication] = useState(()=>{const value=new URLSearchParams(window.location.search).get('publication');return ['brouillon','publiee'].includes(value)?value:'';});
   const [options, setOptions] = useState({ poles: [] });
   useEffect(() => {
     if (kind !== 'formations') return;
@@ -49,13 +50,9 @@ export function ResourceList({ kind }) {
           {result.state === 'erreur' && <div className="admin-notice error"><p role="alert">{result.error}</p><button className="admin-button secondary" onClick={() => { loading(); setRetry(retry + 1); }}>Réessayer</button></div>}
           {result.state === 'pret' && (result.items.length === 0 ? <p role="status" className="admin-notice">{poleId || publication ? 'Aucun résultat pour ces critères.' : q ? 'Aucun résultat pour cette recherche.' : `Aucun${kind === 'formations' ? 'e' : ''} ${config.singular} pour le moment. Créez votre première fiche.`}</p> : <>
             <p className="admin-count" role="status">{result.total} résultat{result.total > 1 ? 's' : ''}</p>
-            <ul className="admin-resource-list">{result.items.map(item => <li key={item.id}>
-              <div><h2><a href={`/admin/catalogue/${kind}/${encodeURIComponent(item.id)}/modifier`}>{item[config.name]}</a></h2>
-                {item.slug && <span className="admin-tag">{item.slug}</span>}
-                {kind === 'formations' && <div className="admin-record-meta"><PublicationBadge publiee={item.publiee} /><span>{item.pole?.titre || 'Pôle non renseigné'}</span><span>{item.tarif === null ? 'Tarif non renseigné' : item.tarif === '0.00' ? 'Gratuite' : `${item.tarif} ${item.devise}`}</span></div>}
-                <p>{item[config.summary] ? item[config.summary].slice(0, 180) + (item[config.summary].length > 180 ? '…' : '') : 'Présentation non renseignée.'}</p></div>
-              <a className="admin-button secondary" href={`/admin/catalogue/${kind}/${encodeURIComponent(item.id)}/modifier`} aria-label={`Modifier ${item[config.name]}`}>Modifier</a>
-            </li>)}</ul>
+            <AdminTable label={'Liste des '+config.title.toLowerCase()} columns={kind==='formations'?['Formation','Publication','Pôle et tarif','Actions']:['Nom','Présentation','Actions']}>
+ {result.items.map(item=><tr key={item.id}><th scope="row"><a className="admin-row-title" href={`/admin/catalogue/${kind}/${encodeURIComponent(item.id)}/modifier`}>{item[config.name]}</a>{kind==='formations'&&<small className="admin-row-description">{item[config.summary]?item[config.summary].slice(0,160)+(item[config.summary].length>160?'…':''):'Présentation non renseignée.'}</small>}</th>{kind==='formations'?<><td data-label="Publication"><PublicationBadge publiee={item.publiee}/></td><td data-label="Pôle et tarif">{item.pole?.titre||'Pôle non renseigné'}<small>{item.tarif===null?'Tarif non renseigné':item.tarif==='0.00'?'Gratuite':`${item.tarif} ${item.devise}`}</small></td></>:<td data-label="Présentation">{item[config.summary]?item[config.summary].slice(0,180)+(item[config.summary].length>180?'…':''):'Présentation non renseignée.'}</td>}<td data-label="Actions"><a className="admin-row-action" href={`/admin/catalogue/${kind}/${encodeURIComponent(item.id)}/modifier`} aria-label={`Modifier ${item[config.name]}`}>Modifier</a>{kind==='formations'&&<div className="admin-row-actions"><a href={`/admin/catalogue/formations/${item.id}/contenu`}>Contenu pédagogique</a><a href={`/admin/catalogue/sessions?formationId=${encodeURIComponent(item.id)}`}>Voir les sessions</a></div>}</td></tr>)}
+ </AdminTable>
             <nav className="admin-pagination" aria-label="Pagination"><button className="admin-button secondary" disabled={page === 1} onClick={() => { setPage(page - 1); loading(); }}>Précédent</button><span>Page {page} sur {Math.ceil(result.total / 20)}</span><button className="admin-button secondary" disabled={page * 20 >= result.total} onClick={() => { setPage(page + 1); loading(); }}>Suivant</button></nav>
           </>)}
         </div>

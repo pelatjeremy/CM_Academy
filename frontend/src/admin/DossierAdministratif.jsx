@@ -1,3 +1,4 @@
+import AdminTable from './AdminTable';
 import PresenceSynthese from '../presences/PresenceSynthese';
 import AttestationsDossier from './AttestationsDossier';
 import QuestionnairesDossier from './QuestionnairesDossier';
@@ -25,22 +26,15 @@ function HistoriqueDossier({item}) {
   const events = [...inscription, ...initialisation, ...documents, ...fichiers]
     .sort((a, b) => new Date(a.date) - new Date(b.date) || a.id.localeCompare(b.id));
 
-  return <section className="admin-panel" aria-labelledby="dossier-historique">
-    <h2 id="dossier-historique">Historique</h2>
-    <ol className="admin-dossier-history">{events.map(event => <li key={event.id}>
-      <p><time dateTime={event.date}>{formatParis(event.date)}</time>
-        {' · '}{event.auteur?.email || 'Système'}</p>
-      {event.type === 'initialisation' && <p>Initialisation du dossier et conservation de sa configuration documentaire.</p>}
-      {event.type === 'inscription' && <p>Inscription · {event.ancienStatut ? statutsInscription[event.ancienStatut] + ' → ' : 'Dépôt · '}{statutsInscription[event.nouveauStatut]}</p>}
-      {event.type === 'depot' && <p>Pièce jointe · {categories[event.categorie]} · Version {event.version} · {event.nomOriginal}</p>}
-      {event.type === 'document' && <>
-        <p>{categories[event.categorie]} · {etats[event.ancienEtat]} → {etats[event.nouvelEtat]}</p>
-        {event.ancienneNote !== event.nouvelleNote && <>
-          <p className="admin-dossier-note">Note précédente · {event.ancienneNote || 'Vide'}</p>
-          <p className="admin-dossier-note">Nouvelle note · {event.nouvelleNote || 'Vide'}</p>
-        </>}
-      </>}
-    </li>)}</ol>
+  return <section className="admin-panel" aria-labelledby="dossier-historique"><h2 id="dossier-historique">Historique</h2><p className="admin-count">{events.length} événement{events.length>1?'s':''}</p>
+    <AdminTable label="Historique du dossier administratif" columns={['Date et auteur','Événement','Détail']}>
+    {events.map(event=><tr key={event.id}><th scope="row"><time dateTime={event.date}>{formatParis(event.date)}</time><small>{event.auteur?.email||'Système'}</small></th><td data-label="Événement"><span className="admin-badge">{event.type==='initialisation'?'Initialisation':event.type==='inscription'?'Inscription':event.type==='depot'?'Dépôt de fichier':'Suivi documentaire'}</span></td><td data-label="Détail">
+    {event.type==='initialisation'&&'Initialisation du dossier et conservation de sa configuration documentaire.'}
+    {event.type==='inscription'&&<>{event.ancienStatut?statutsInscription[event.ancienStatut]+' → ':'Dépôt · '}{statutsInscription[event.nouveauStatut]}</>}
+    {event.type==='depot'&&<>{categories[event.categorie]}<small>Version {event.version} · {event.nomOriginal}</small></>}
+    {event.type==='document'&&<>{categories[event.categorie]}<small>{etats[event.ancienEtat]} → {etats[event.nouvelEtat]}</small>{event.ancienneNote!==event.nouvelleNote&&<details><summary>Consulter la modification de note</summary><p className="admin-dossier-note">Note précédente · {event.ancienneNote||'Vide'}</p><p className="admin-dossier-note">Nouvelle note · {event.nouvelleNote||'Vide'}</p></details>}</>}
+    </td></tr>)}
+    </AdminTable>
   </section>;
 }
 
@@ -154,7 +148,7 @@ export default function DossierAdministratif({id, setDirty}) {
   return <>
     <a className="admin-back" href="/admin/inscriptions">← Inscriptions</a>
     <div className="admin-page-heading"><div><h1>Dossier administratif</h1>
-      <p>Suivi individuel rattaché à l’inscription.</p>
+      <p>{item?item.prenom+' '+item.nom+' · '+item.session.formation.titre:'Suivi individuel rattaché à l’inscription.'}</p>
     </div></div>
     {loading && <p role="status">Chargement du dossier…</p>}
     {error && <div className="admin-notice error" role="alert"><p>{error}</p>

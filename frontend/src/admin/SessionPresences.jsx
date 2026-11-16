@@ -29,7 +29,7 @@ function Releve({inscription,seance,onDirty}){
   finally{setBusy(false);lock.current=false;setConfirm(false);}
  }
  const nom=inscription.prenom+' '+inscription.nom;
- return <article className="admin-seance"><h3>{nom}</h3>
+ return <details className="admin-presence-editor"><summary><span><strong>{nom}</strong><span className={'admin-badge '+(item?.etat==='PRESENT'?'published':'draft')}>{etatsPresence[item?.etat||'NON_RENSEIGNE']}</span><span>{dureePresence(item?.dureeSuivieMs??null)}</span><span className="admin-presence-edit-label">{readonly?'Consulter':'Renseigner / modifier'}</span></span></summary><article className="admin-seance"><h3>{nom}</h3>
   {readonly?<p>Inscription {inscription.statut==='ANNULEE'?'annulée':'non confirmée'} : historique conservé en lecture seule.</p>:future?<p>La séance n’a pas encore commencé. La saisie sera disponible après son début.</p>:null}
   <p>État enregistré : {etatsPresence[item?.etat||'NON_RENSEIGNE']} · {dureePresence(item?.dureeSuivieMs??null)}</p>
   {confirm&&<Confirmation titre={item?'Confirmer la correction ?':'Enregistrer la présence ?'} message="Présence renseignée manuellement. Les anciennes valeurs, la date et l’auteur seront conservés ; aucun état documentaire ne sera validé." confirmer={item?'Enregistrer la correction':'Enregistrer la présence'} onConfirm={save} onCancel={()=>setConfirm(false)} busy={busy}/>}
@@ -42,7 +42,7 @@ function Releve({inscription,seance,onDirty}){
    <button className="admin-button" disabled={busy||future||conflict||!dirty}>{busy?'Enregistrement…':item?'Enregistrer la correction':'Enregistrer la présence'}</button>
   </fieldset></form>}
   {item&&<PresenceHistorique item={item}/>}
- </article>;
+ </article></details>;
 }
 export default function SessionPresences({id,setDirty}){
  const [state,setState]=useState({loading:true}),[attempt,setAttempt]=useState(0),pending=useRef(new Set());
@@ -52,7 +52,7 @@ export default function SessionPresences({id,setDirty}){
  return <section><a href={'/admin/catalogue/sessions/'+id+'/modifier'}>← Session</a><h1>Présences {item?'— '+item.formation.titre:''}</h1><p>Présence renseignée manuellement. Horaires Europe/Paris. Les relevés ne constituent pas une signature d’émargement.</p>
   <p>Dès qu’un relevé existe, les horaires et la durée de la séance sont verrouillés, même si ce relevé revient à Non renseigné.</p>
   {state.loading&&<p role="status">Chargement des séances et inscriptions…</p>}{state.error&&<div role="alert"><p>{state.error}</p><button className="admin-button secondary" onClick={()=>setAttempt(n=>n+1)}>Réessayer</button></div>}
-  {item&&<>{!item.seances.length?<p>Aucune séance programmée.</p>:!confirmees.length?<p>Aucune inscription confirmée.</p>:<h2>Inscriptions confirmées</h2>}
+  {item&&<><dl className="admin-summary-metrics"><div><dt>Inscriptions confirmées</dt><dd>{confirmees.length}</dd></div><div><dt>Séances programmées</dt><dd>{item.seances.length}</dd></div><div><dt>Heures programmées</dt><dd>{dureePresence(item.seances.reduce((sum,s)=>sum+(new Date(s.fin)-new Date(s.debut)),0))}</dd></div><div><dt>Durée de la formation</dt><dd>{dureePresence(item.formation.dureeMinutes===null?null:item.formation.dureeMinutes*60000)}</dd></div></dl>{!item.seances.length?<p>Aucune séance programmée.</p>:!confirmees.length?<p>Aucune inscription confirmée.</p>:<h2>Inscriptions confirmées</h2>}
    {item.seances.map(seance=><section className="admin-panel" key={seance.id}><h2>{plageFr(seance.debut,seance.fin)}</h2><p>Durée programmée : {dureePresence(new Date(seance.fin)-new Date(seance.debut))}</p>
     {confirmees.map(inscription=><Releve key={inscription.id} inscription={inscription} seance={seance} onDirty={onDirty}/>)}
     {!!historiques.filter(i=>i.presences.some(p=>p.seanceId===seance.id)).length&&<h3>Historique des inscriptions non confirmées</h3>}

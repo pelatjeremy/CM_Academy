@@ -1,3 +1,4 @@
+import AdminTable from './AdminTable';
 import InvitationStagiaire from './InvitationStagiaire';
 import {useEffect, useState} from 'react';
 import {adminRequest} from './api';
@@ -26,7 +27,7 @@ function useInscriptions(url) {
 }
 
 function ListeInscriptions() {
-  const [params, setParams] = useState({q: '', statut: '', sessionId: '', page: 1});
+  const [params, setParams] = useState(()=>{const query=new URLSearchParams(window.location.search);return {q:'',statut:Object.hasOwn(statuts,query.get('statut'))?query.get('statut'):'',sessionId:'',page:1};});
   const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== ''));
   const [liste, setListe] = useInscriptions('/api/admin/inscriptions?' + query);
   const [options] = useInscriptions('/api/admin/inscriptions/options');
@@ -73,14 +74,9 @@ function ListeInscriptions() {
       {liste.erreur && <p role="alert">{liste.erreur}</p>}
       {liste.data && <>
         <p className="admin-count" role="status">{liste.data.total} demande(s)</p>
-        {liste.data.items.length === 0 ? <p>Aucune demande à afficher.</p> : <ul className="admin-resource-list">
-          {liste.data.items.map(item => <li key={item.id}>
-            <div><h2><a href={'/admin/inscriptions/' + item.id}>{item.prenom} {item.nom}</a></h2>
-              <p>{sessionLabel(item.session)}</p><p>{typeDemande(item)}</p>
-              <a href={'/admin/inscriptions/' + item.id + '/dossier'}>Ouvrir le dossier administratif</a></div>
-            <span className={'admin-badge ' + (item.statut === 'CONFIRMEE' ? 'published' : 'draft')}>{statuts[item.statut]}</span>
-          </li>)}
-        </ul>}
+        {liste.data.items.length === 0 ? <p>Aucune demande à afficher.</p> : <AdminTable label="Demandes d’inscription" columns={['Stagiaire','Formation et session','Type de demande','Statut','Actions']}>
+ {liste.data.items.map(item=><tr key={item.id}><th scope="row"><a className="admin-row-title" href={'/admin/inscriptions/'+item.id}>{item.prenom} {item.nom}</a></th><td data-label="Formation et session"><strong>{item.session.formation.titre}</strong><small>{item.session.seances.length?formatParis(item.session.seances[0].debut):'Sans date'}</small></td><td data-label="Type de demande">{typeDemande(item)}</td><td data-label="Statut"><span className={'admin-badge '+(item.statut==='CONFIRMEE'?'published':'draft')}>{statuts[item.statut]}</span></td><td data-label="Actions"><div className="admin-row-actions"><a href={'/admin/inscriptions/'+item.id}>Voir la demande</a><a href={'/admin/inscriptions/'+item.id+'/dossier'}>Ouvrir le dossier administratif</a></div></td></tr>)}
+ </AdminTable>}
         {liste.data.total > 20 && <nav className="admin-pagination" aria-label="Pagination des inscriptions">
           <button className="admin-button secondary" disabled={params.page === 1} onClick={() => filtre('page', params.page - 1)}>Précédent</button>
           <span>Page {params.page} sur {Math.ceil(liste.data.total / 20)}</span>
@@ -121,7 +117,7 @@ function DetailInscription({id}) {
       <div className="admin-panel">
         <h2>Demande</h2>
         <p><a href={'/admin/inscriptions/' + item.id + '/dossier'}>Ouvrir le dossier administratif</a></p>
-        <dl>
+        <dl className="admin-detail-grid">
           <dt>Session</dt><dd>{sessionLabel(item.session)}</dd>
           <dt>Adresse email</dt><dd>{item.email}</dd>
           <dt>Demande reçue le</dt><dd>{formatParis(item.createdAt)}</dd>

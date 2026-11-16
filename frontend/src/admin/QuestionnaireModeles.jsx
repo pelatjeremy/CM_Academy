@@ -1,3 +1,4 @@
+import AdminTable from './AdminTable';
 import {useEffect,useRef,useState} from 'react';
 import {adminRequest} from './api';
 import {categoriesQuestionnaire,typesQuestion} from '../questionnaires/labels';
@@ -38,7 +39,7 @@ export default function QuestionnaireModeles({id,setDirty}){
  if(!editing)return <section><div className="admin-page-heading"><h1>Questionnaires</h1><a className="admin-button" href="/admin/questionnaires/nouveau">Créer un modèle</a></div>
   <div className="admin-panel"><form onSubmit={e=>{e.preventDefault();setState({loading:true});setParams({q:new FormData(e.currentTarget).get('q'),page:1});}}><label className="admin-label" htmlFor="modeles-recherche">Rechercher un modèle</label><div className="admin-actions"><input className="admin-input" id="modeles-recherche" name="q" maxLength={160}/><button className="admin-button secondary">Rechercher</button></div></form>
   {state.loading&&<p role="status">Chargement…</p>}{state.error&&<p role="alert">{state.error}</p>}
-  {state.data&&<>{!state.data.items.length?<p>Aucun modèle de questionnaire.</p>:<ul className="admin-resource-list">{state.data.items.map(m=><li key={m.id}><div><h2><a href={'/admin/questionnaires/'+m.id}>{m.titre}</a></h2><p>{categoriesQuestionnaire[m.categorie]}</p></div><span className={'admin-badge '+(m.valide?'published':'draft')}>{m.valide?'Validé':'Brouillon'}</span></li>)}</ul>}
+  {state.data&&<>{!state.data.items.length?<p>Aucun modèle de questionnaire.</p>:<AdminTable label="Modèles de questionnaire" columns={['Modèle','Catégorie','État','Action']}>{state.data.items.map(m=><tr key={m.id}><th scope="row"><a className="admin-row-title" href={'/admin/questionnaires/'+m.id}>{m.titre}</a></th><td data-label="Catégorie">{categoriesQuestionnaire[m.categorie]}</td><td data-label="État"><span className={'admin-badge '+(m.valide?'published':'draft')}>{m.valide?'Validé':'Brouillon'}</span></td><td data-label="Action"><a className="admin-row-action" href={'/admin/questionnaires/'+m.id}>Voir le modèle</a></td></tr>)}</AdminTable>}
    {state.data.total>20&&<nav className="admin-pagination" aria-label="Pagination des modèles"><button className="admin-button secondary" disabled={params.page===1} onClick={()=>setParams(p=>({...p,page:p.page-1}))}>Précédent</button><span>Page {params.page}</span><button className="admin-button secondary" disabled={params.page*20>=state.data.total} onClick={()=>setParams(p=>({...p,page:p.page+1}))}>Suivant</button></nav>}</>}
   </div></section>;
  return <section><a href="/admin/questionnaires">← Modèles de questionnaire</a><h1>{creating?'Créer un modèle':'Modifier le modèle'}</h1>
